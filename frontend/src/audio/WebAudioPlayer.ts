@@ -8,6 +8,7 @@ export class WebAudioPlayer {
   private sourceNode: MediaElementAudioSourceNode | null = null;
   private filterNode: BiquadFilterNode | null = null;
   private gainNode: GainNode | null = null;
+  private analyserNode: AnalyserNode | null = null;
 
   private dspFilterEnabled: boolean = false;
   private volume: number = 1.0;
@@ -43,6 +44,10 @@ export class WebAudioPlayer {
       this.gainNode = this.audioContext.createGain();
       this.gainNode.gain.setValueAtTime(this.volume, this.audioContext.currentTime);
 
+      this.analyserNode = this.audioContext.createAnalyser();
+      this.analyserNode.fftSize = 256;
+      this.analyserNode.smoothingTimeConstant = 0.8;
+
       this.filterNode = this.audioContext.createBiquadFilter();
       this.filterNode.type = 'bandpass';
       // Center frequency for speech (geometric mean of 300Hz and 3000Hz is ~948Hz, arithmetic ~1650Hz)
@@ -75,11 +80,21 @@ export class WebAudioPlayer {
         this.sourceNode.connect(this.gainNode);
       }
 
-      this.gainNode.connect(this.audioContext.destination);
+      if (this.analyserNode) {
+        this.gainNode.connect(this.analyserNode);
+        this.analyserNode.connect(this.audioContext.destination);
+      } else {
+        this.gainNode.connect(this.audioContext.destination);
+      }
     } catch (e) {
       // In tests or edge disconnection cases
     }
   }
+
+  public getAnalyser(): AnalyserNode | null {
+    return this.analyserNode;
+  }
+
 
   private handleEnded = (): void => {
     this.onEnded?.();
