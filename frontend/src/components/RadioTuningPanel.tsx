@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { SMeterBar } from './SMeterBar';
-import { Radio, Plus, Trash2, BookmarkCheck } from 'lucide-react';
+import { Radio, BookmarkCheck, MoreVertical, Edit2, Play, Trash2, Check, X } from 'lucide-react';
 
 export interface PresetItem {
   id?: number;
@@ -28,6 +28,7 @@ export interface RadioTuningPanelProps {
     ppmOffset?: number;
   }) => void;
   onCreatePreset?: (preset: Omit<PresetItem, 'id'>) => void;
+  onUpdatePreset?: (preset: PresetItem) => void;
   onDeletePreset?: (presetId: number) => void;
   className?: string;
 }
@@ -65,19 +66,28 @@ export const RadioTuningPanel: React.FC<RadioTuningPanelProps> = ({
   presets = DEFAULT_PRESETS,
   onTune,
   onCreatePreset,
+  onUpdatePreset,
   onDeletePreset,
   className = '',
 }) => {
-  const [showAddPreset, setShowAddPreset] = useState(false);
-  const [newPresetName, setNewPresetName] = useState('');
-  const [newPresetCategory, setNewPresetCategory] = useState('Airband');
-  const [isEditingFreq, setIsEditingFreq] = useState(false);
-  const [freqInputValue, setFreqInputValue] = useState((frequencyHz / 1e6).toFixed(4));
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+  const [editingPreset, setEditingPreset] = useState<PresetItem | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editCategory, setEditCategory] = useState('Airband');
+  const [editFreqMHz, setEditFreqMHz] = useState('118.200');
+  const [editMod, setEditMod] = useState('AM');
+  const menuRef = useRef<HTMLDivElement>(null);
 
-  const handleStep = (stepHz: number) => {
-    const nextHz = Math.max(100000, Math.min(2000000000, frequencyHz + stepHz));
-    onTune({ frequencyHz: nextHz });
-  };
+  // Close 3-dots popup on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpenMenuId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleModulationChange = (mod: string) => {
     onTune({ modulation: mod });
@@ -87,33 +97,33 @@ export const RadioTuningPanel: React.FC<RadioTuningPanelProps> = ({
     onTune({ squelchThreshold: threshold });
   };
 
-  const handleFreqSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const parsedMHz = parseFloat(freqInputValue);
-    if (!isNaN(parsedMHz)) {
-      const nextHz = Math.round(parsedMHz * 1e6);
-      if (nextHz >= 100000 && nextHz <= 2000000000) {
-        onTune({ frequencyHz: nextHz });
-      }
-    }
-    setIsEditingFreq(false);
+  const handleStartEdit = (p: PresetItem) => {
+    setEditingPreset(p);
+    setEditName(p.name);
+    setEditCategory(p.category || 'General');
+    setEditFreqMHz((p.frequency_hz / 1e6).toFixed(4));
+    setEditMod(p.modulation);
+    setOpenMenuId(null);
   };
 
-  const handleAddPresetSubmit = (e: React.FormEvent) => {
+  const handleSaveEdit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPresetName.trim()) return;
+    if (!editingPreset) return;
+    const parsedMHz = parseFloat(editFreqMHz);
+    const hz = !isNaN(parsedMHz) ? Math.round(parsedMHz * 1e6) : editingPreset.frequency_hz;
 
-    if (onCreatePreset) {
-      onCreatePreset({
-        name: newPresetName.trim(),
-        frequency_hz: frequencyHz,
-        modulation: modulation,
-        squelch_threshold: squelchThreshold,
-        category: newPresetCategory,
-      });
+    const updated: PresetItem = {
+      ...editingPreset,
+      name: editName.trim() || editingPreset.name,
+      category: editCategory,
+      frequency_hz: hz,
+      modulation: editMod,
+    };
+
+    if (onUpdatePreset) {
+      onUpdatePreset(updated);
     }
-    setNewPresetName('');
-    setShowAddPreset(false);
+    setEditingPreset(null);
   };
 
   return (
@@ -135,105 +145,16 @@ export const RadioTuningPanel: React.FC<RadioTuningPanelProps> = ({
       </div>
 
       <div className="p-4 space-y-5 flex-1">
-        {/* Frequency Readout & Direct Edit */}
-        <div className="bg-ash border border-charcoal rounded-cards p-3 text-center">
-          <div className="text-[11px] text-smoke uppercase tracking-wider mb-1 font-sans">
+        {/* Clean Read-Only Frequency Readout (No Buttons, No Badge) */}
+        <div className="bg-ash border border-charcoal rounded-cards p-3.5 text-center">
+          <div className="text-[11px] text-smoke uppercase tracking-wider mb-1 font-sans font-medium">
             Tuned Frequency
           </div>
-
-          {isEditingFreq ? (
-            <form onSubmit={handleFreqSubmit} className="flex items-center gap-1.5 my-1">
-              <input
-                type="number"
-                step="0.001"
-                autoFocus
-                value={freqInputValue}
-                onChange={(e) => setFreqInputValue(e.target.value)}
-                onBlur={handleFreqSubmit}
-                className="w-full bg-obsidian border border-slate focus:border-phosphor-green rounded-inputs px-2 py-1 text-center font-mono text-base text-snow outline-none"
-              />
-              <span className="text-xs text-smoke font-mono">MHz</span>
-            </form>
-          ) : (
-            <button
-              onClick={() => {
-                setFreqInputValue((frequencyHz / 1e6).toFixed(4));
-                setIsEditingFreq(true);
-              }}
-              title="Click to manually enter frequency in MHz"
-              className="font-mono text-xl text-snow font-medium hover:text-phosphor-green transition-colors cursor-pointer tracking-tight"
-            >
-              {formatFrequencyHz(frequencyHz)}
-            </button>
-          )}
-
-          <div className="text-[10px] text-smoke font-mono mt-0.5">
-            {(frequencyHz / 1e6).toFixed(4)} MHz
+          <div className="font-mono text-xl text-snow font-semibold tracking-tight">
+            {formatFrequencyHz(frequencyHz)}
           </div>
-        </div>
-
-        {/* Quick Step Buttons */}
-        <div>
-          <div className="text-[11px] text-smoke uppercase tracking-wider mb-2 font-medium">
-            Frequency Step
-          </div>
-          <div className="grid grid-cols-4 gap-1.5 text-xs font-mono">
-            <button
-              type="button"
-              onClick={() => handleStep(-1000000)}
-              className="py-1.5 bg-ash border border-charcoal hover:border-slate text-silver-mist hover:text-snow rounded-inputs transition-colors text-center"
-            >
-              -1M
-            </button>
-            <button
-              type="button"
-              onClick={() => handleStep(1000000)}
-              className="py-1.5 bg-ash border border-charcoal hover:border-slate text-silver-mist hover:text-snow rounded-inputs transition-colors text-center"
-            >
-              +1M
-            </button>
-            <button
-              type="button"
-              onClick={() => handleStep(-100000)}
-              className="py-1.5 bg-ash border border-charcoal hover:border-slate text-silver-mist hover:text-snow rounded-inputs transition-colors text-center"
-            >
-              -100k
-            </button>
-            <button
-              type="button"
-              onClick={() => handleStep(100000)}
-              className="py-1.5 bg-ash border border-charcoal hover:border-slate text-silver-mist hover:text-snow rounded-inputs transition-colors text-center"
-            >
-              +100k
-            </button>
-            <button
-              type="button"
-              onClick={() => handleStep(-25000)}
-              className="py-1.5 bg-ash border border-charcoal hover:border-slate text-silver-mist hover:text-snow rounded-inputs transition-colors text-center"
-            >
-              -25k
-            </button>
-            <button
-              type="button"
-              onClick={() => handleStep(25000)}
-              className="py-1.5 bg-ash border border-charcoal hover:border-slate text-silver-mist hover:text-snow rounded-inputs transition-colors text-center"
-            >
-              +25k
-            </button>
-            <button
-              type="button"
-              onClick={() => handleStep(-8333)}
-              className="py-1.5 bg-ash border border-charcoal hover:border-slate text-silver-mist hover:text-snow rounded-inputs transition-colors text-center"
-            >
-              -8.33k
-            </button>
-            <button
-              type="button"
-              onClick={() => handleStep(8333)}
-              className="py-1.5 bg-ash border border-charcoal hover:border-slate text-silver-mist hover:text-snow rounded-inputs transition-colors text-center"
-            >
-              +8.33k
-            </button>
+          <div className="text-[11px] text-smoke font-mono mt-1">
+            {(frequencyHz / 1e6).toFixed(4)} MHz · {modulation}
           </div>
         </div>
 
@@ -283,89 +204,101 @@ export const RadioTuningPanel: React.FC<RadioTuningPanelProps> = ({
 
         {/* Channel Presets List */}
         <div className="pt-2 border-t border-charcoal">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-2.5">
             <div className="text-[11px] text-smoke uppercase tracking-wider font-medium">
               Channel Presets
             </div>
-            <button
-              type="button"
-              onClick={() => setShowAddPreset(!showAddPreset)}
-              className="flex items-center gap-1 text-[11px] text-silver-mist hover:text-phosphor-green transition-colors cursor-pointer"
-            >
-              <Plus className="w-3 h-3" />
-              <span>Add Preset</span>
-            </button>
           </div>
 
-          {/* Add Preset Form */}
-          {showAddPreset && (
-            <form onSubmit={handleAddPresetSubmit} className="bg-ash border border-charcoal rounded-inputs p-2.5 mb-2.5 space-y-2">
+          {/* Edit Preset Inline Modal/Dialog */}
+          {editingPreset && (
+            <form onSubmit={handleSaveEdit} className="bg-ash border border-phosphor-green/40 rounded-inputs p-3 mb-3 space-y-2.5">
+              <div className="text-xs font-medium text-snow flex items-center justify-between">
+                <span>Edit Channel</span>
+                <button
+                  type="button"
+                  onClick={() => setEditingPreset(null)}
+                  className="text-smoke hover:text-snow"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
               <input
                 type="text"
-                placeholder="Preset name (e.g. Tower)"
-                value={newPresetName}
-                onChange={(e) => setNewPresetName(e.target.value)}
-                autoFocus
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="Channel Name"
                 className="w-full bg-obsidian border border-slate focus:border-phosphor-green rounded-inputs px-2 py-1 text-xs text-snow outline-none"
               />
-              <div className="flex items-center justify-between gap-2">
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="number"
+                  step="0.001"
+                  value={editFreqMHz}
+                  onChange={(e) => setEditFreqMHz(e.target.value)}
+                  placeholder="Freq (MHz)"
+                  className="w-full bg-obsidian border border-slate focus:border-phosphor-green rounded-inputs px-2 py-1 text-xs text-snow font-mono outline-none"
+                />
                 <select
-                  value={newPresetCategory}
-                  onChange={(e) => setNewPresetCategory(e.target.value)}
-                  className="bg-obsidian border border-slate rounded-inputs px-2 py-1 text-[11px] text-silver-mist outline-none"
+                  value={editMod}
+                  onChange={(e) => setEditMod(e.target.value)}
+                  className="bg-obsidian border border-slate rounded-inputs px-2 py-1 text-xs text-silver-mist outline-none"
                 >
-                  <option value="Airband">Airband</option>
-                  <option value="Marine">Marine</option>
-                  <option value="Ham">Ham</option>
-                  <option value="General">General</option>
+                  <option value="AM">AM</option>
+                  <option value="NFM">NFM</option>
                 </select>
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setShowAddPreset(false)}
-                    className="px-2 py-1 text-[11px] text-smoke hover:text-snow"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-2.5 py-1 text-[11px] bg-phosphor-green text-obsidian font-medium rounded-pill hover:bg-mint-pulse transition-colors"
-                  >
-                    Save
-                  </button>
-                </div>
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setEditingPreset(null)}
+                  className="px-2.5 py-1 text-xs text-smoke hover:text-snow"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-3 py-1 text-xs bg-phosphor-green text-obsidian font-medium rounded-pill hover:bg-mint-pulse transition-colors"
+                >
+                  Save
+                </button>
               </div>
             </form>
           )}
 
           {/* Preset Items List */}
-          <div className="space-y-1.5">
+          <div className="space-y-1.5" ref={menuRef}>
             {presets.map((p) => {
               const isSelected = p.frequency_hz === frequencyHz && p.modulation === modulation;
+              const isMenuOpen = openMenuId === p.id;
+
               return (
                 <div
                   key={p.id ?? p.name}
-                  className={`group flex items-center justify-between p-2 rounded-inputs border transition-colors cursor-pointer ${
+                  className={`relative flex items-center justify-between p-2 rounded-inputs border transition-colors ${
                     isSelected
                       ? 'bg-ash border-phosphor-green/40 text-snow'
                       : 'bg-obsidian border-charcoal hover:border-slate text-silver-mist'
                   }`}
-                  onClick={() =>
-                    onTune({
-                      frequencyHz: p.frequency_hz,
-                      modulation: p.modulation,
-                      squelchThreshold: p.squelch_threshold ?? squelchThreshold,
-                    })
-                  }
                 >
-                  <div className="flex items-center gap-2 min-w-0">
+                  {/* Preset Info */}
+                  <div
+                    className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer"
+                    onClick={() =>
+                      onTune({
+                        frequencyHz: p.frequency_hz,
+                        modulation: p.modulation,
+                        squelchThreshold: p.squelch_threshold ?? squelchThreshold,
+                      })
+                    }
+                  >
                     <BookmarkCheck
                       className={`w-3.5 h-3.5 flex-shrink-0 ${
                         isSelected ? 'text-phosphor-green' : 'text-smoke'
                       }`}
                     />
                     <div className="truncate">
-                      <div className="text-xs font-medium truncate text-snow group-hover:text-phosphor-green transition-colors">
+                      <div className="text-xs font-medium truncate text-snow hover:text-phosphor-green transition-colors">
                         {p.name}
                       </div>
                       <div className="text-[10px] text-smoke font-mono">
@@ -374,25 +307,75 @@ export const RadioTuningPanel: React.FC<RadioTuningPanelProps> = ({
                     </div>
                   </div>
 
+                  {/* Active Recording Pill & 3-Dots Button */}
                   <div className="flex items-center gap-1.5">
-                    {p.category && (
-                      <span className="text-[9px] px-1 py-0.5 rounded bg-ash text-smoke border border-charcoal">
-                        {p.category}
+                    {isSelected && (
+                      <span className="text-[10px] font-mono text-phosphor-green bg-phosphor-green/10 border border-phosphor-green/30 px-1.5 py-0.5 rounded-pill font-medium flex items-center gap-1">
+                        ● RECORDING
                       </span>
                     )}
-                    {onDeletePreset && p.id && (
+
+                    {/* 3-Dots Action Button */}
+                    <div className="relative">
                       <button
                         type="button"
+                        aria-label="Channel options"
                         onClick={(e) => {
                           e.stopPropagation();
-                          onDeletePreset(p.id!);
+                          setOpenMenuId(isMenuOpen ? null : (p.id ?? null));
                         }}
-                        className="opacity-0 group-hover:opacity-100 text-smoke hover:text-red-400 p-1 transition-opacity"
-                        title="Delete preset"
+                        className="p-1 rounded hover:bg-charcoal text-smoke hover:text-snow transition-colors cursor-pointer"
                       >
-                        <Trash2 className="w-3 h-3" />
+                        <MoreVertical className="w-3.5 h-3.5" />
                       </button>
-                    )}
+
+                      {/* 3-Dots Popup Dropdown Menu */}
+                      {isMenuOpen && (
+                        <div className="absolute right-0 top-6 w-36 bg-ash border border-charcoal rounded-inputs shadow-lg py-1 z-50 text-xs font-sans">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleStartEdit(p);
+                            }}
+                            className="w-full flex items-center gap-2 px-3 py-1.5 text-silver-mist hover:text-snow hover:bg-charcoal text-left transition-colors cursor-pointer"
+                          >
+                            <Edit2 className="w-3.5 h-3.5 text-smoke" />
+                            <span>Edit</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenMenuId(null);
+                              onTune({
+                                frequencyHz: p.frequency_hz,
+                                modulation: p.modulation,
+                                squelchThreshold: p.squelch_threshold ?? squelchThreshold,
+                              });
+                            }}
+                            className="w-full flex items-center gap-2 px-3 py-1.5 text-silver-mist hover:text-phosphor-green hover:bg-charcoal text-left transition-colors cursor-pointer"
+                          >
+                            <Play className="w-3.5 h-3.5 text-phosphor-green" />
+                            <span>Activate (Aktif)</span>
+                          </button>
+                          {onDeletePreset && p.id && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenMenuId(null);
+                                onDeletePreset(p.id!);
+                              }}
+                              className="w-full flex items-center gap-2 px-3 py-1.5 text-silver-mist hover:text-red-400 hover:bg-charcoal text-left transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                              <span>Delete</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               );

@@ -5,8 +5,9 @@ import { DongleConfigModal } from '../components/DongleConfigModal';
 import { TopBar } from '../components/TopBar';
 
 describe('RadioTuningPanel & SMeterBar & DongleConfigModal & TopBar', () => {
-  test('displays frequency controls, modulation buttons, and squelch slider', () => {
+  test('displays clean read-only frequency without badge, hides add/trash buttons, and renders 3-dots menu with Edit/Activate/Delete', () => {
     const handleTune = jest.fn();
+    const handleDeletePreset = jest.fn();
     render(
       <RadioTuningPanel
         frequencyHz={118200000}
@@ -15,41 +16,46 @@ describe('RadioTuningPanel & SMeterBar & DongleConfigModal & TopBar', () => {
         rssi={-65.0}
         squelchOpen={false}
         onTune={handleTune}
+        onDeletePreset={handleDeletePreset}
+        presets={[
+          { id: 1, name: 'Haneda Tower', frequency_hz: 118200000, modulation: 'AM', category: 'Airband' },
+          { id: 2, name: 'Tokyo Approach', frequency_hz: 119100000, modulation: 'AM', category: 'Airband' },
+        ]}
       />
     );
 
-    // Formatted frequency
+    // Formatted frequency is displayed cleanly
     expect(screen.getByText(/118\.200\.000/i)).toBeInTheDocument();
-    // Modulation buttons
-    expect(screen.getByText(/AM \(Airband\)/i)).toBeInTheDocument();
-    expect(screen.getByText(/NFM \(VHF\/UHF\)/i)).toBeInTheDocument();
 
-    // Quick step buttons
-    expect(screen.getByRole('button', { name: /-1M/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /\+1M/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /-25k/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /\+25k/i })).toBeInTheDocument();
+    // No step increment/decrement buttons
+    expect(screen.queryByRole('button', { name: /-1M/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /\+1M/i })).not.toBeInTheDocument();
+
+    // No badge indicator on frequency display
+    expect(screen.queryByText(/RECORDING LOCKED/i)).not.toBeInTheDocument();
+
+    // No Add Preset button and no direct trash icons
+    expect(screen.queryByText(/Add Preset/i)).not.toBeInTheDocument();
+    expect(screen.queryByTitle(/Delete preset/i)).not.toBeInTheDocument();
+
+    // Active preset has RECORDING label
+    expect(screen.getByText(/● RECORDING/i)).toBeInTheDocument();
+
+    // 3-dots menu button exists
+    const moreBtns = screen.getAllByRole('button', { name: /Channel options/i });
+    expect(moreBtns.length).toBe(2);
+    fireEvent.click(moreBtns[1]); // click 3-dots on Tokyo Approach
+
+    // Popup options appear: Edit, Activate/Aktif, Delete
+    expect(screen.getByText(/Edit/i)).toBeInTheDocument();
+    expect(screen.getByText(/Activate|Aktif/i)).toBeInTheDocument();
+    expect(screen.getByText(/Delete/i)).toBeInTheDocument();
+
+    // Clicking Activate calls onTune
+    fireEvent.click(screen.getByText(/Activate|Aktif/i));
+    expect(handleTune).toHaveBeenCalledWith(expect.objectContaining({ frequencyHz: 119100000 }));
   });
 
-  test('calls onTune when step buttons or modulation are clicked', () => {
-    const handleTune = jest.fn();
-    render(
-      <RadioTuningPanel
-        frequencyHz={118200000}
-        modulation="AM"
-        squelchThreshold={-42.0}
-        rssi={-50.0}
-        squelchOpen={true}
-        onTune={handleTune}
-      />
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: /\+1M/i }));
-    expect(handleTune).toHaveBeenCalledWith(expect.objectContaining({ frequencyHz: 119200000 }));
-
-    fireEvent.click(screen.getByText(/NFM \(VHF\/UHF\)/i));
-    expect(handleTune).toHaveBeenCalledWith(expect.objectContaining({ modulation: 'NFM' }));
-  });
 
   test('SMeterBar renders RSSI value, squelch needle, and open/closed state', () => {
     const handleSquelchChange = jest.fn();
