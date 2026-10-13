@@ -21,6 +21,13 @@ def _get_receiver(request: Request):
     return getattr(request.app.state, "receiver", None)
 
 
+@router.get("/devices")
+def list_available_devices() -> List[Dict[str, Any]]:
+    """Enumerate attached RTL-SDR USB dongles or return simulator."""
+    from backend.sdr.receiver import get_available_devices
+    return get_available_devices()
+
+
 @router.get("/status")
 def get_radio_status(request: Request, db: sqlite3.Connection = Depends(get_db)) -> Dict[str, Any]:
     """Return current radio tuning, hardware state, and DSP squelch metrics."""

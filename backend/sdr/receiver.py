@@ -2,6 +2,7 @@
 import asyncio
 import inspect
 import logging
+import re
 import shutil
 import subprocess
 from dataclasses import dataclass
@@ -42,6 +43,48 @@ def is_hardware_available(device_index: int = 0) -> bool:
             return False
 
     return False
+
+
+def get_available_devices() -> List[Dict[str, Any]]:
+    """
+    Enumerate RTL-SDR hardware devices connected to the host using rtl_test.
+    Returns a list of device dictionaries: [{"index": int, "name": str, "available": bool}].
+    If no devices are detected or rtl_test is unavailable, returns a fallback Virtual Simulator device.
+    """
+    rtl_test_bin = shutil.which("rtl_test")
+    devices: List[Dict[str, Any]] = []
+
+    if rtl_test_bin:
+        try:
+            res = subprocess.run(
+                [rtl_test_bin, "-t"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=1.5,
+            )
+            output = (res.stdout + res.stderr).decode("utf-8", errors="ignore")
+            for line in output.splitlines():
+                match = re.match(r"^\s*(\d+):\s*(.+)$", line)
+                if match:
+                    idx = int(match.group(1))
+                    name = match.group(2).strip()
+                    devices.append({
+                        "index": idx,
+                        "name": f"Device {idx}: {name}",
+                        "available": True,
+                    })
+        except Exception as e:
+            logger.debug(f"Device enumeration exception: {e}")
+
+    if not devices:
+        devices.append({
+            "index": 0,
+            "name": "Mock SDR Simulator (Virtual)",
+            "available": True,
+        })
+
+    return devices
+
 
 
 @dataclass

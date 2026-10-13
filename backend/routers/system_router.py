@@ -1,14 +1,24 @@
 """System monitoring and telemetry endpoints for SDR-Recorder NVR."""
 import os
 import shutil
-from typing import Any, Dict
+import sqlite3
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, Request
+from pydantic import BaseModel, Field
 
 from backend import config
 from backend.auth import get_current_user
+from backend.database import get_db
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
+
+
+class SystemSettingsUpdate(BaseModel):
+    retention_days: Optional[int] = Field(None, ge=1, le=365)
+    max_disk_usage_percent: Optional[int] = Field(None, ge=10, le=99)
+    audio_format: Optional[str] = Field(None, pattern="^(wav|opus)$")
+
 
 
 def _get_cpu_percent() -> float:
@@ -97,3 +107,50 @@ def get_system_stats(request: Request) -> Dict[str, Any]:
         "memory": _get_memory_info(),
         "storage": _get_storage_info(),
     }
+
+
+@router.get("/settings")
+def get_system_settings(db: sqlite3.Connection = Depends(get_db)) -> Dict[str, Any]:
+    """Retrieve system retention and storage limits."""
+    cursor = db.cursor()
+    cursor.execute("SELECT retention_days, max_disk_usage_percent, audio_format FROM system_settings WHERE id = 1")
+    row = cursor.fetchone()
+    if not row:
+        return {"retention_days": 14, "max_disk_usage_percent": 90, "audio_format": "opus"}
+    return dict(row)
+
+
+@router.post("/settings")
+def update_system_settings(
+    payload: SystemSettingsUpdate,
+    db: sqlite3.Connection = Depends(get_db),
+) -> Dict[str, Any]:
+    """Update system retention and storage quota settings."""
+    cursor = db.cursor()
+    cursor.execute("SELECT retention_days, max_disk_usage_percent, audio_format FROM system_settings WHERE id = 1")
+    row = cursor.fetchone()
+    current = dict(row) if row else {"retention_days": 14, "max_disk_usage_percent": 90, "audio_format": "opus"}
+
+    new_retention = payload.retention_days if payload.retention_days is not None else current["retention_days"]
+    new_disk = payload.max_disk_usage_percent if payload.max_disk_usage_percent is not None else current["max_disk_usage_percent"]
+    new_format = payload.audio_format if payload.audio_format is not None else current["audio_format"]
+
+    cursor.execute(
+        """
+        INSERT INTO system_settings (id, retention_days, max_disk_usage_percent, audio_format)
+        VALUES (1, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+            retention_days = excluded.retention_days,
+            max_disk_usage_percent = excluded.max_disk_usage_percent,
+            audio_format = excluded.audio_format
+        """,
+        (new_retention, new_disk, new_format),
+    )
+    db.commit()
+
+    return {
+        "retention_days": new_retention,
+        "max_disk_usage_percent": new_disk,
+        "audio_format": new_format,
+    }
+
