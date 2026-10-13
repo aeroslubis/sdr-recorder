@@ -2,7 +2,8 @@
 import os
 import sqlite3
 from pathlib import Path
-from typing import Generator, Optional
+from typing import Any, Generator, Optional
+from fastapi import Request
 from backend import config
 from backend.models import hash_password
 
@@ -147,9 +148,12 @@ def init_db(db_path: Optional[str] = None) -> None:
         conn.close()
 
 
-def get_db() -> Generator[sqlite3.Connection, None, None]:
+def get_db(request: Request = None) -> Generator[sqlite3.Connection, None, None]:
     """FastAPI dependency to yield a database connection."""
-    conn = get_connection()
+    db_path = None
+    if request is not None and hasattr(request, "app") and hasattr(request.app.state, "db_path"):
+        db_path = request.app.state.db_path
+    conn = get_connection(db_path)
     try:
         yield conn
     finally:
