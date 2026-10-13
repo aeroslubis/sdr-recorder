@@ -1,0 +1,530 @@
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { TopBar } from './TopBar';
+import { RadioTuningPanel, PresetItem } from './RadioTuningPanel';
+import { TimelineScrubber, TransmissionInterval } from './TimelineScrubber';
+import { PlaybackControls } from './PlaybackControls';
+import { CallLogPanel, CallLogItem } from './CallLogPanel';
+import { DongleConfigModal, DongleHardwareConfig } from './DongleConfigModal';
+import { WebAudioPlayer } from '../audio/WebAudioPlayer';
+import { formatDate } from './HistoryDatePicker';
+import { Volume2, VolumeX, Filter } from 'lucide-react';
+
+export interface DashboardLayoutProps {
+  className?: string;
+}
+
+export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = '' }) => {
+  const { user, token, logout } = useAuth();
+
+  // Selected date for NVR playback
+  const [selectedDate, setSelectedDate] = useState<string>(() => formatDate(new Date()));
+  const [activeDates, setActiveDates] = useState<string[]>([]);
+
+  // Hardware and Radio state
+  const [frequencyHz, setFrequencyHz] = useState<number>(118200000);
+  const [modulation, setModulation] = useState<string>('AM');
+  const [squelchThreshold, setSquelchThreshold] = useState<number>(-42.0);
+  const [rfGain, setRfGain] = useState<number>(38.6);
+  const [ppmOffset, setPpmOffset] = useState<number>(0);
+  const [isSimulator, setIsSimulator] = useState<boolean>(true);
+  const [presets, setPresets] = useState<PresetItem[]>([]);
+
+  // Live WebSocket Telemetry
+  const [liveRssi, setLiveRssi] = useState<number>(-75.0);
+  const [squelchOpen, setSquelchOpen] = useState<boolean>(false);
+  const [isRecording, setIsRecording] = useState<boolean>(false);
+  const [liveUnsquelched, setLiveUnsquelched] = useState<boolean>(false);
+
+  // Archive & Timeline state
+  const [timelineTransmissions, setTimelineTransmissions] = useState<TransmissionInterval[]>([]);
+  const [calls, setCalls] = useState<CallLogItem[]>([]);
+  const [selectedCallId, setSelectedCallId] = useState<number | null>(null);
+  const [currentTimeMs, setCurrentTimeMs] = useState<number>(0);
+
+  // Playback state
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [playbackRate, setPlaybackRate] = useState<number>(1.0);
+  const [dspFilterActive, setDspFilterActive] = useState<boolean>(false);
+  const [volume, setVolume] = useState<number>(1.0);
+  const [activeCallTitle, setActiveCallTitle] = useState<string>('');
+
+  // Modals
+  const [isDongleModalOpen, setIsDongleModalOpen] = useState<boolean>(false);
+
+  // Audio player ref
+  const audioPlayerRef = useRef<WebAudioPlayer | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+
+  // Initialize WebAudioPlayer
+  useEffect(() => {
+    const player = new WebAudioPlayer();
+    audioPlayerRef.current = player;
+
+    player.onStateChange = (playing) => {
+      setIsPlaying(playing);
+    };
+
+    player.onEnded = () => {
+      setIsPlaying(false);
+    };
+
+    return () => {
+      player.stop();
+      audioPlayerRef.current = null;
+    };
+  }, []);
+
+  // Sync volume, speed, dsp filter with audio player
+  useEffect(() => {
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.setVolume(volume);
+    }
+  }, [volume]);
+
+  useEffect(() => {
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.setPlaybackRate(playbackRate);
+    }
+  }, [playbackRate]);
+
+  useEffect(() => {
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.setDspFilter(dspFilterActive);
+    }
+  }, [dspFilterActive]);
+
+  // Auth fetch helper
+  const authFetch = useCallback(
+    async (url: string, options: RequestInit = {}) => {
+      const headers = new Headers(options.headers || {});
+      if (token) {
+        headers.set('Authorization', `Bearer ${token}`);
+      }
+      return fetch(url, { ...options, headers });
+    },
+    [token]
+  );
+
+  // Fetch initial Radio status & presets
+  useEffect(() => {
+    authFetch('/api/radio/status')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) {
+          if (data.frequency_hz) setFrequencyHz(data.frequency_hz);
+          if (data.modulation) setModulation(data.modulation);
+          if (data.squelch_threshold !== undefined) setSquelchThreshold(data.squelch_threshold);
+          if (data.rf_gain !== undefined) setRfGain(data.rf_gain);
+          if (data.ppm_offset !== undefined) setPpmOffset(data.ppm_offset);
+          if (data.is_simulator !== undefined) setIsSimulator(data.is_simulator);
+        }
+      })
+      .catch(() => {});
+
+    authFetch('/api/radio/presets')
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data: PresetItem[]) => {
+        if (Array.isArray(data)) setPresets(data);
+      })
+      .catch(() => {});
+
+    authFetch('/api/recordings/active-dates')
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data: string[]) => {
+        if (Array.isArray(data)) setActiveDates(data);
+      })
+      .catch(() => {});
+  }, [authFetch]);
+
+  // Fetch timeline intervals and call log when selectedDate changes
+  useEffect(() => {
+    authFetch(`/api/recordings/timeline?date=${selectedDate}`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data: TransmissionInterval[]) => {
+        if (Array.isArray(data)) {
+          setTimelineTransmissions(data);
+        }
+      })
+      .catch(() => {});
+
+    authFetch(`/api/recordings?date=${selectedDate}&limit=200`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data: CallLogItem[]) => {
+        if (Array.isArray(data)) {
+          setCalls(data);
+        }
+      })
+      .catch(() => {});
+  }, [authFetch, selectedDate]);
+
+  // WebSocket Live Connection
+  useEffect(() => {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/live${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+
+    let socket: WebSocket;
+    let isCancelled = false;
+
+    try {
+      socket = new WebSocket(wsUrl);
+      wsRef.current = socket;
+
+      socket.onopen = () => {
+        if (token) {
+          socket.send(JSON.stringify({ type: 'auth', token }));
+        }
+      };
+
+      socket.onmessage = (event) => {
+        if (isCancelled) return;
+        if (typeof event.data === 'string') {
+          try {
+            const msg = JSON.parse(event.data);
+            if (msg.type === 'telemetry') {
+              if (msg.rssi_dbfs !== undefined) setLiveRssi(msg.rssi_dbfs);
+              if (msg.squelch_open !== undefined) setSquelchOpen(msg.squelch_open);
+              if (msg.recording !== undefined) setIsRecording(msg.recording);
+              if (msg.frequency_hz !== undefined) setFrequencyHz(msg.frequency_hz);
+              if (msg.modulation !== undefined) setModulation(msg.modulation);
+            }
+          } catch {
+            // Ignore parse errors on binary frames
+          }
+        }
+      };
+
+      socket.onerror = () => {
+        // Suppress unhandled ws errors in test
+      };
+    } catch {
+      // Graceful fallback if WebSocket unavailable
+    }
+
+    return () => {
+      isCancelled = true;
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+    };
+  }, [token]);
+
+  // Tune Radio Handler
+  const handleTune = async (params: {
+    frequencyHz?: number;
+    modulation?: string;
+    squelchThreshold?: number;
+    rfGain?: number;
+    ppmOffset?: number;
+  }) => {
+    if (params.frequencyHz !== undefined) setFrequencyHz(params.frequencyHz);
+    if (params.modulation !== undefined) setModulation(params.modulation);
+    if (params.squelchThreshold !== undefined) setSquelchThreshold(params.squelchThreshold);
+    if (params.rfGain !== undefined) setRfGain(params.rfGain);
+    if (params.ppmOffset !== undefined) setPpmOffset(params.ppmOffset);
+
+    try {
+      await authFetch('/api/radio/tune', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+      });
+    } catch {
+      // Local state is already updated
+    }
+  };
+
+  // Preset Handlers
+  const handleCreatePreset = async (newPreset: Omit<PresetItem, 'id'>) => {
+    try {
+      const res = await authFetch('/api/radio/presets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newPreset),
+      });
+      if (res.ok) {
+        const created = await res.json();
+        setPresets((prev) => [...prev, created]);
+      }
+    } catch {}
+  };
+
+  const handleDeletePreset = async (id: number) => {
+    try {
+      await authFetch(`/api/radio/presets/${id}`, { method: 'DELETE' });
+      setPresets((prev) => prev.filter((p) => p.id !== id));
+    } catch {}
+  };
+
+  // Play Audio for a Call
+  const handlePlayCall = async (call: CallLogItem) => {
+    setSelectedCallId(call.id);
+    const timeDisplay = call.startTime || call.start_time || '';
+    const durDisplay = (call.durationSec ?? call.duration_sec ?? 0).toFixed(1);
+    setActiveCallTitle(`Call #${call.id} · ${timeDisplay} (${durDisplay}s)`);
+
+    // Match timeline transmission start_ms to position scrubber
+    const matchingTx = timelineTransmissions.find((t) => t.id === call.id);
+    if (matchingTx) {
+      setCurrentTimeMs(matchingTx.start_ms);
+    }
+
+    if (audioPlayerRef.current) {
+      const audioUrl = `/api/recordings/${call.id}/audio${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+      try {
+        await audioPlayerRef.current.playUrl(audioUrl);
+      } catch {
+        // Player error handler catches this
+      }
+    }
+  };
+
+  // Star Toggle Handler
+  const handleToggleStar = async (callId: number, nextStarred: boolean) => {
+    setCalls((prev) =>
+      prev.map((c) => (c.id === callId ? { ...c, isStarred: nextStarred, is_starred: nextStarred ? 1 : 0 } : c))
+    );
+    try {
+      await authFetch(`/api/recordings/${callId}/star`, { method: 'POST' });
+    } catch {}
+  };
+
+  // Play / Pause transport toggle
+  const handlePlayPause = () => {
+    if (!audioPlayerRef.current) return;
+    if (isPlaying) {
+      audioPlayerRef.current.pause();
+    } else {
+      audioPlayerRef.current.play().catch(() => {});
+    }
+  };
+
+  // Prev / Next call buttons
+  const handlePrevCall = () => {
+    if (calls.length === 0) return;
+    const curIndex = calls.findIndex((c) => c.id === selectedCallId);
+    const prevIndex = curIndex > 0 ? curIndex - 1 : calls.length - 1;
+    handlePlayCall(calls[prevIndex]);
+  };
+
+  const handleNextCall = () => {
+    if (calls.length === 0) return;
+    const curIndex = calls.findIndex((c) => c.id === selectedCallId);
+    const nextIndex = curIndex >= 0 && curIndex < calls.length - 1 ? curIndex + 1 : 0;
+    handlePlayCall(calls[nextIndex]);
+  };
+
+  // Timeline Seeker
+  const handleTimelineSeek = (timeMs: number) => {
+    setCurrentTimeMs(timeMs);
+    // Find transmission intersecting or closest to timeMs
+    const tx = timelineTransmissions.find((t) => timeMs >= t.start_ms && timeMs <= t.end_ms);
+    if (tx) {
+      setSelectedCallId(tx.id);
+      const call = calls.find((c) => c.id === tx.id);
+      if (call) {
+        setActiveCallTitle(`Call #${tx.id} · ${call.startTime || call.start_time || ''}`);
+      }
+    }
+  };
+
+  // Timeline Transmission Selection
+  const handleSelectTransmission = (id: number) => {
+    setSelectedCallId(id);
+    const call = calls.find((c) => c.id === id);
+    if (call) {
+      handlePlayCall(call);
+    }
+  };
+
+  // Export current clip
+  const handleExportClip = () => {
+    if (!selectedCallId) return;
+    const downloadUrl = `/api/recordings/${selectedCallId}/audio${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.download = `transmission-${selectedCallId}.opus`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  // Live Unsquelch Monitor toggle
+  const handleToggleLiveMonitor = () => {
+    const nextState = !liveUnsquelched;
+    setLiveUnsquelched(nextState);
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'listen', unsquelched: nextState }));
+    }
+  };
+
+  // Dongle Save Config Handler
+  const handleSaveDongleConfig = async (newConfig: DongleHardwareConfig) => {
+    try {
+      await authFetch('/api/radio/dongle-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newConfig),
+      });
+      setIsDongleModalOpen(false);
+    } catch {}
+  };
+
+  return (
+    <div className={`min-h-screen bg-obsidian text-snow flex flex-col font-circular ${className}`}>
+      {/* 1. TopBar Header */}
+      <TopBar
+        frequencyHz={frequencyHz}
+        modulation={modulation}
+        isSimulator={isSimulator}
+        username={user?.username || 'admin'}
+        onOpenDongleConfig={() => setIsDongleModalOpen(true)}
+        onLogout={logout}
+      />
+
+      {/* 2. Responsive 3-Column Dashboard Body */}
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+        {/* Left Column: Radio Tuning Panel (300px) */}
+        <div className="w-full lg:w-72 xl:w-80 shrink-0 border-r border-charcoal bg-obsidian/40 overflow-y-auto">
+          <RadioTuningPanel
+            frequencyHz={frequencyHz}
+            modulation={modulation}
+            squelchThreshold={squelchThreshold}
+            rfGain={rfGain}
+            ppmOffset={ppmOffset}
+            rssi={liveRssi}
+            squelchOpen={squelchOpen}
+            presets={presets}
+            onTune={handleTune}
+            onCreatePreset={handleCreatePreset}
+            onDeletePreset={handleDeletePreset}
+          />
+        </div>
+
+        {/* Center Column: Live Monitor, Timeline Scrubber & Playback Controls */}
+        <main className="flex-1 flex flex-col overflow-y-auto p-4 md:p-6 gap-5 bg-obsidian">
+          {/* Live Audio Monitor & Telemetry Bar */}
+          <div className="bg-ash/80 backdrop-blur border border-charcoal rounded-cards px-4 py-3 flex flex-wrap items-center justify-between gap-3 select-none">
+            {/* Live Reception Status */}
+            <div className="flex items-center gap-3 font-mono text-xs">
+              <div
+                className={`w-2.5 h-2.5 rounded-full ${
+                  isRecording
+                    ? 'bg-red-500 animate-ping'
+                    : squelchOpen
+                    ? 'bg-phosphor-green animate-pulse'
+                    : 'bg-smoke'
+                }`}
+              />
+              <span className="font-semibold text-snow">
+                {isRecording
+                  ? 'RECORDING TRANSMISSION'
+                  : squelchOpen
+                  ? 'CARRIER DETECTED (OPEN)'
+                  : 'MONITORING SQUELCH'}
+              </span>
+              <span className="text-smoke">·</span>
+              <span className="text-silver-mist">
+                RSSI: <span className="text-phosphor-green">{liveRssi.toFixed(1)} dBFS</span>
+              </span>
+            </div>
+
+            {/* Live Audio Controls */}
+            <div className="flex items-center gap-3">
+              {/* Voice DSP Filter Toggle */}
+              <button
+                type="button"
+                onClick={() => setDspFilterActive(!dspFilterActive)}
+                aria-label="DSP Voice Filter"
+                title="Toggle 300Hz-3kHz Voice Bandpass Filter"
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-pill border text-xs font-mono transition-colors cursor-pointer ${
+                  dspFilterActive
+                    ? 'bg-phosphor-green/20 border-phosphor-green text-phosphor-green font-medium'
+                    : 'bg-obsidian border-charcoal hover:border-slate text-silver-mist hover:text-snow'
+                }`}
+              >
+                <Filter className="w-3.5 h-3.5" />
+                <span>DSP Filter {dspFilterActive ? 'ON' : 'OFF'}</span>
+              </button>
+
+              {/* Unsquelch Live Monitor Button */}
+              <button
+                type="button"
+                onClick={handleToggleLiveMonitor}
+                aria-label="Live Monitor Unmute"
+                title={liveUnsquelched ? 'Restore Squelch Mute' : 'Bypass Squelch to Listen Live'}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-pill border text-xs font-mono transition-colors cursor-pointer ${
+                  liveUnsquelched
+                    ? 'bg-amber-400/20 border-amber-400 text-amber-300 font-medium'
+                    : 'bg-obsidian border-charcoal hover:border-slate text-silver-mist hover:text-snow'
+                }`}
+              >
+                {liveUnsquelched ? (
+                  <Volume2 className="w-3.5 h-3.5 text-amber-400" />
+                ) : (
+                  <VolumeX className="w-3.5 h-3.5 text-smoke" />
+                )}
+                <span>{liveUnsquelched ? 'Unsquelched' : 'Squelched'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* 24-Hour Canvas Timeline Scrubber */}
+          <div className="flex-1 flex flex-col min-h-[300px]">
+            <TimelineScrubber
+              date={selectedDate}
+              transmissions={timelineTransmissions}
+              currentTimeMs={currentTimeMs}
+              onSeek={handleTimelineSeek}
+              onSelectTransmission={handleSelectTransmission}
+              selectedTransmissionId={selectedCallId}
+            />
+          </div>
+
+          {/* Playback Controls Transport Bar */}
+          <PlaybackControls
+            isPlaying={isPlaying}
+            onPlayPause={handlePlayPause}
+            onPrevCall={handlePrevCall}
+            onNextCall={handleNextCall}
+            playbackRate={playbackRate}
+            onPlaybackRateChange={setPlaybackRate}
+            dspFilterActive={dspFilterActive}
+            onToggleDspFilter={() => setDspFilterActive(!dspFilterActive)}
+            volume={volume}
+            onVolumeChange={setVolume}
+            onExportClip={handleExportClip}
+            hasActiveCall={Boolean(selectedCallId)}
+            activeCallTitle={activeCallTitle}
+          />
+        </main>
+
+        {/* Right Column: Call Log History Panel with HistoryDatePicker */}
+        <CallLogPanel
+          calls={calls}
+          selectedCallId={selectedCallId}
+          playingCallId={isPlaying ? selectedCallId : null}
+          currentDate={selectedDate}
+          onDateChange={setSelectedDate}
+          activeDates={activeDates}
+          onPlay={handlePlayCall}
+          onToggleStar={handleToggleStar}
+          onSelectCall={handleSelectTransmission}
+          onDownload={handleExportClip}
+        />
+      </div>
+
+      {/* Dongle Configuration Modal */}
+      <DongleConfigModal
+        isOpen={isDongleModalOpen}
+        onClose={() => setIsDongleModalOpen(false)}
+        onSave={handleSaveDongleConfig}
+        initialConfig={{
+          rf_gain: rfGain,
+          ppm_offset: ppmOffset,
+        }}
+      />
+    </div>
+  );
+};
