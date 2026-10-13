@@ -4,6 +4,7 @@ set -e
 # SDR-Recorder NVR unified startup script
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_ROOT"
+export PYTHONPATH="${PROJECT_ROOT}:${PYTHONPATH:-}"
 
 echo "=== SDR-Recorder NVR Launcher ==="
 

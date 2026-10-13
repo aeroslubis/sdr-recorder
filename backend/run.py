@@ -8,7 +8,13 @@ import os
 import sys
 from pathlib import Path
 
+# Ensure project root is in sys.path so 'backend.*' imports succeed regardless of launch directory
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 import uvicorn
+from fastapi import HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -27,8 +33,12 @@ def build_app(force_simulator: bool = False):
         if assets_dir.exists():
             app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="static_assets")
 
-        @app.get("/{full_path:path}")
+        @app.api_route("/{full_path:path}", methods=["GET", "HEAD"])
         async def serve_spa_frontend(full_path: str):
+            # Do not intercept unmatched API or WebSocket routes
+            if full_path.startswith("api/") or full_path.startswith("ws/") or full_path == "api" or full_path == "ws":
+                raise HTTPException(status_code=404, detail="Not Found")
+
             # If path matches a static file in dist, serve it
             target_path = dist_dir / full_path
             if full_path and target_path.exists() and target_path.is_file():
@@ -39,9 +49,15 @@ def build_app(force_simulator: bool = False):
             if index_path.exists():
                 return FileResponse(str(index_path))
 
-            return {"detail": "Frontend assets not found"}
+            raise HTTPException(status_code=404, detail="Frontend assets not found")
 
     return app
+
+
+def create_app_factory():
+    """Application factory for uvicorn with reload support."""
+    force_sim = os.environ.get("SDR_FORCE_SIMULATOR", "").lower() in ["1", "true", "yes"]
+    return build_app(force_simulator=force_sim)
 
 
 def main():
@@ -54,8 +70,6 @@ def main():
 
     force_sim = args.simulator or os.environ.get("SDR_FORCE_SIMULATOR", "").lower() in ["1", "true", "yes"]
 
-    app = build_app(force_simulator=force_sim)
-
     print(f"==================================================")
     print(f"       SDR-Recorder NVR Server Starting           ")
     print(f"==================================================")
@@ -65,13 +79,26 @@ def main():
     print(f" Default Login    : admin / 12345")
     print(f"==================================================")
 
-    uvicorn.run(
-        app,
-        host=args.host,
-        port=args.port,
-        reload=args.reload,
-        log_level="info",
-    )
+    if args.reload:
+        if force_sim:
+            os.environ["SDR_FORCE_SIMULATOR"] = "1"
+        uvicorn.run(
+            "backend.run:create_app_factory",
+            factory=True,
+            host=args.host,
+            port=args.port,
+            reload=True,
+            log_level="info",
+        )
+    else:
+        app = build_app(force_simulator=force_sim)
+        uvicorn.run(
+            app,
+            host=args.host,
+            port=args.port,
+            reload=False,
+            log_level="info",
+        )
 
 
 if __name__ == "__main__":
