@@ -12,6 +12,7 @@ from backend.database import get_connection, init_db
 from backend.routers.auth_router import router as auth_router
 from backend.routers.radio_router import router as radio_router
 from backend.routers.recordings_router import router as recordings_router
+from backend.routers.system_router import router as system_router
 from backend.routers.ws_router import ConnectionManager, router as ws_router
 from backend.sdr.dongle_config import DongleConfig
 from backend.sdr.receiver import SDRReceiver, TransmissionEvent
@@ -140,6 +141,7 @@ def create_app(
     app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
     app.include_router(radio_router, prefix="/api/radio", tags=["Radio Control"])
     app.include_router(recordings_router, prefix="/api/recordings", tags=["Recordings Archive"])
+    app.include_router(system_router, prefix="/api/system", tags=["System & Telemetry"])
     app.include_router(ws_router, tags=["WebSocket Live Stream"])
 
     @app.get("/api/health")
