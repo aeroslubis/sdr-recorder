@@ -128,8 +128,16 @@ class TimelineItem(BaseModel):
     id: int
     start_ms: int
     end_ms: int
-    peak_rssi: float
     duration_sec: float
+    peak_rssi_dbfs: float
+    peak_rssi: Optional[float] = None
+    frequency_hz: int = 0
+    modulation: str = "AM"
+    is_starred: int = 0
+
+
+class UpdateNotesRequest(BaseModel):
+    notes: Optional[str] = None
 
 
 # System Settings Models

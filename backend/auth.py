@@ -67,17 +67,24 @@ def revoke_token(token: str) -> None:
 
 async def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    token: Optional[str] = None,
     db: sqlite3.Connection = Depends(get_db),
 ) -> Dict[str, Any]:
-    """Dependency to retrieve the authenticated user from bearer token."""
-    if credentials is None or not credentials.credentials:
+    """Dependency to retrieve the authenticated user from bearer token or query parameter."""
+    raw_token = None
+    if credentials and credentials.credentials:
+        raw_token = credentials.credentials
+    elif token:
+        raw_token = token
+
+    if not raw_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    payload = decode_access_token(credentials.credentials)
+    payload = decode_access_token(raw_token)
     username = payload.get("sub") or payload.get("username")
     if not username:
         raise HTTPException(
