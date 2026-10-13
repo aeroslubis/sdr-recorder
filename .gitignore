@@ -1,0 +1,11 @@
+.superpowers/
+__pycache__/
+*.pyc
+node_modules/
+dist/
+storage/
+.venv/
+venv/
+*.db
+*.db-wal
+*.db-shm
