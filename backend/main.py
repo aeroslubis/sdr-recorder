@@ -12,6 +12,7 @@ from backend.database import get_connection, init_db
 from backend.routers.auth_router import router as auth_router
 from backend.routers.radio_router import router as radio_router
 from backend.routers.recordings_router import router as recordings_router
+from backend.routers.ws_router import ConnectionManager, router as ws_router
 from backend.sdr.dongle_config import DongleConfig
 from backend.sdr.receiver import SDRReceiver, TransmissionEvent
 from backend.storage.audio_writer import save_transmission
@@ -117,6 +118,15 @@ def create_app(
 
     app.state.receiver.on_transmission_end_callback = handle_transmission_end
 
+    # Initialize WebSocket connection manager and receiver chunk callback
+    ws_mgr = ConnectionManager()
+    app.state.ws_manager = ws_mgr
+
+    async def handle_receiver_chunk(chunk: bytes, result: Any) -> None:
+        await ws_mgr.handle_chunk(chunk, result, receiver=app.state.receiver)
+
+    app.state.receiver.on_chunk_callback = handle_receiver_chunk
+
     # CORS Middleware
     app.add_middleware(
         CORSMiddleware,
@@ -130,6 +140,7 @@ def create_app(
     app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
     app.include_router(radio_router, prefix="/api/radio", tags=["Radio Control"])
     app.include_router(recordings_router, prefix="/api/recordings", tags=["Recordings Archive"])
+    app.include_router(ws_router, tags=["WebSocket Live Stream"])
 
     @app.get("/api/health")
     def health_check() -> Dict[str, Any]:
