@@ -37,6 +37,7 @@
 - **Single Hardware Indicator:** TopBar hardware status displays a single colored pulsing dot without duplicate white bullet text.
 - **Unified Settings Modal:** All settings are housed in a single modal with 4 tabs: `Dongle`, `Channel Setup`, `Storage`, and `Password`.
 - **Safe Device Probe:** Subprocess execution of `rtl_test -t` must have a timeout of 1.5s to avoid blocking if a hardware dongle is busy or unplugged.
+- **Professional Branding (No NVR / CCTV):** Remove all "NVR" and "CCTV" labels/branding from the entire application UI (TopBar brand, login page, page titles, aria labels). Rebrand cleanly as **SDR Recorder** for an elegant, professional radio communications monitoring tool.
 
 ---
 
