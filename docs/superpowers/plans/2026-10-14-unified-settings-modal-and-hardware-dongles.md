@@ -58,7 +58,7 @@
   - `GET /api/system/settings`: Returns `{ retention_days: int, max_disk_usage_percent: int, audio_format: str }`.
   - `POST /api/system/settings`: Updates retention settings in SQLite database `system_settings` table.
 
-- [ ] **Step 1: Write failing test for device enumeration and system settings API**
+- [x] **Step 1: Write failing test for device enumeration and system settings API**
 
 ```python
 # backend/tests/test_devices_settings.py
@@ -105,21 +105,21 @@ def test_system_settings_api(tmp_path):
         assert update_res.json()["retention_days"] == 30
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `.venv/bin/pytest backend/tests/test_devices_settings.py -v`
 Expected: FAIL (ImportError / 404 Not Found)
 
-- [ ] **Step 3: Implement device probe parser in `receiver.py` and settings routes in `radio_router.py` & `system_router.py`**
+- [x] **Step 3: Implement device probe parser in `receiver.py` and settings routes in `radio_router.py` & `system_router.py`**
 
 Parse `Found N device(s)` lines from `rtl_test -t` with regex. Fallback to simulator device if none found. Expose `GET /api/radio/devices` and `GET`/`POST` `/api/system/settings`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `.venv/bin/pytest backend/tests/test_devices_settings.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add backend/sdr/receiver.py backend/routers/radio_router.py backend/routers/system_router.py backend/tests/test_devices_settings.py
@@ -150,7 +150,7 @@ git commit -m "feat(backend): add sdr device enumeration and system settings api
     - The active channel being recorded renders a distinct `● RECORDING` indicator badge in phosphor green.
   - Squelch slider and S-meter remain interactive for live sensitivity adjustment.
 
-- [ ] **Step 1: Write failing test in `RadioTuningPanel.test.tsx`**
+- [x] **Step 1: Write failing test in `RadioTuningPanel.test.tsx`**
 
 ```tsx
 // frontend/src/__tests__/RadioTuningPanel.test.tsx
@@ -199,21 +199,21 @@ test('displays clean read-only frequency without badge, hides add/trash buttons,
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd frontend && npm test -- --run src/__tests__/RadioTuningPanel.test.tsx`
 Expected: FAIL
 
-- [ ] **Step 3: Update `RadioTuningPanel.tsx`**
+- [x] **Step 3: Update `RadioTuningPanel.tsx`**
 
 Remove the step buttons and inline frequency editing form. Remove the Add Preset button and direct trash icon. Implement 3-dots (`MoreVertical`) dropdown menu with `Edit`, `Activate`, and `Delete` actions. Style the frequency readout cleanly with high contrast snow text. Add the `● RECORDING` pill badge next to the matching active preset.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd frontend && npm test -- --run src/__tests__/RadioTuningPanel.test.tsx`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/components/RadioTuningPanel.tsx frontend/src/__tests__/RadioTuningPanel.test.tsx
@@ -238,7 +238,7 @@ git commit -m "feat(frontend): clean read-only frequency readout and 3-dots pres
     - Dynamic responsiveness: when squelch opens / speech occurs, spectrum surges dynamically; when squelched, displays low-level simulated ambient RF noise floor matching `liveRssi`.
     - Compact height (~90px - 110px) with live frequency marker, modulation, and signal readout.
 
-- [ ] **Step 1: Write failing component test in `LiveSpectrumVisualizer.test.tsx`**
+- [x] **Step 1: Write failing component test in `LiveSpectrumVisualizer.test.tsx`**
 
 ```tsx
 // frontend/src/__tests__/LiveSpectrumVisualizer.test.tsx
@@ -262,21 +262,21 @@ test('renders live SDR spectrum visualizer canvas with frequency and squelch rea
 ```
 
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd frontend && npm test -- --run src/__tests__/LiveSpectrumVisualizer.test.tsx`
 Expected: FAIL
 
-- [ ] **Step 3: Implement `AnalyserNode` in `WebAudioPlayer.ts` and build `LiveSpectrumVisualizer.tsx`**
+- [x] **Step 3: Implement `AnalyserNode` in `WebAudioPlayer.ts` and build `LiveSpectrumVisualizer.tsx`**
 
 Connect `AnalyserNode` (`fftSize = 256`, `smoothingTimeConstant = 0.8`) in `WebAudioPlayer`. In `LiveSpectrumVisualizer`, implement HTML5 Canvas `requestAnimationFrame` loop that draws FFT bars and waterfall lines in phosphor green.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd frontend && npm test -- --run src/__tests__/LiveSpectrumVisualizer.test.tsx`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/audio/WebAudioPlayer.ts frontend/src/components/LiveSpectrumVisualizer.tsx frontend/src/__tests__/LiveSpectrumVisualizer.test.tsx
@@ -299,7 +299,7 @@ git commit -m "feat(frontend): add browsdr live sdr spectrum and waterfall visua
   - **Tab 3 `Storage`**: Retention period slider (1 to 365 days), maximum disk usage quota (50% to 95%), audio recording format selector (`WAV` / `Opus`), and disk storage gauge.
   - **Tab 4 `Password`**: Old password, new password, confirmation password with validation and change password API submission.
 
-- [ ] **Step 1: Write failing component test for SettingsModal tabs and interactions**
+- [x] **Step 1: Write failing component test for SettingsModal tabs and interactions**
 
 ```tsx
 // frontend/src/__tests__/SettingsModal.test.tsx
@@ -335,21 +335,21 @@ test('renders unified settings modal with 4 tabs and switches between them', () 
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd frontend && npm test -- --run src/__tests__/SettingsModal.test.tsx`
 Expected: FAIL
 
-- [ ] **Step 3: Implement `SettingsModal.tsx` adhering to Supabase design tokens**
+- [x] **Step 3: Implement `SettingsModal.tsx` adhering to Supabase design tokens**
 
 Implement tab bar header with active Phosphor Green indicator, device selector with live query to `/api/radio/devices`, presets management in Channel Setup tab, storage retention sliders, and change password form.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd frontend && npm test -- --run src/__tests__/SettingsModal.test.tsx`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/components/SettingsModal.tsx frontend/src/__tests__/SettingsModal.test.tsx
@@ -385,7 +385,7 @@ git commit -m "feat(frontend): implement unified 4-tab settings modal"
       - Password change -> `POST /api/auth/change-password`
       - Presets -> `POST /api/radio/presets` and `DELETE /api/radio/presets/{id}`
 
-- [ ] **Step 1: Write failing test in `TopBar.test.tsx` for admin dropdown menu tabs**
+- [x] **Step 1: Write failing test in `TopBar.test.tsx` for admin dropdown menu tabs**
 
 ```tsx
 // frontend/src/__tests__/TopBar.test.tsx
@@ -406,26 +406,26 @@ test('clicking menu items triggers onOpenSettings with corresponding tab', () =>
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd frontend && npm test -- --run src/__tests__/TopBar.test.tsx`
 Expected: FAIL
 
-- [ ] **Step 3: Update `TopBar.tsx` and wire in `DashboardLayout.tsx`**
+- [x] **Step 3: Update `TopBar.tsx` and wire in `DashboardLayout.tsx`**
 
 Replace disconnected callbacks with unified `onOpenSettings(tab)`. Embed `LiveSpectrumVisualizer` directly above `TimelineScrubber`. Wire `SettingsModal` with API endpoints.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd frontend && npm test -- --run`
 Expected: PASS
 
-- [ ] **Step 5: Run full test suite and verify build**
+- [x] **Step 5: Run full test suite and verify build**
 
 Run: `.venv/bin/pytest tests/ backend/tests/ -v && cd frontend && npm run build`
 Expected: PASS (all tests green, 0 build errors)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add frontend/src/components/TopBar.tsx frontend/src/components/DashboardLayout.tsx frontend/src/__tests__/TopBar.test.tsx
@@ -440,11 +440,11 @@ git commit -m "feat: wire unified settings modal and live sdr visualizer to dash
 2. **Frontend Tests:** Run `npm test -- --run` in `frontend/` to ensure all unit & component tests pass.
 3. **Production Build:** Run `npm run build` in `frontend/` to verify zero TypeScript or bundler errors.
 4. **Manual End-to-End Checklist:**
-   - [ ] Admin menu: Click "⚙ SDR Dongle Configuration" -> opens SettingsModal on Dongle tab.
-   - [ ] Admin menu: Click "🗄 Storage & Retention Manager" -> opens SettingsModal on Storage tab.
-   - [ ] Admin menu: Click "🔑 Change Password" -> opens SettingsModal on Password tab.
-   - [ ] Admin menu: Click "📻 Channel Setup" -> opens SettingsModal on Channels tab.
-   - [ ] Dongle tab: Device selector shows real RTL-SDR dongle (or Simulator if not plugged in).
-   - [ ] Frequency display on main dashboard: Clean read-only text, no stepping buttons, no `RECORDING LOCKED` badge.
-   - [ ] Channel preset list: Matching active preset shows `● RECORDING` in phosphor green.
-   - [ ] Center column: Real-time BrowSDR-style spectrum and waterfall canvas is visible above the 24h timeline scrubber, reacting to audio transmission bursts.
+   - [x] Admin menu: Click "⚙ SDR Dongle Configuration" -> opens SettingsModal on Dongle tab.
+   - [x] Admin menu: Click "🗄 Storage & Retention Manager" -> opens SettingsModal on Storage tab.
+   - [x] Admin menu: Click "🔑 Change Password" -> opens SettingsModal on Password tab.
+   - [x] Admin menu: Click "📻 Channel Setup" -> opens SettingsModal on Channels tab.
+   - [x] Dongle tab: Device selector shows real RTL-SDR dongle (or Simulator if not plugged in).
+   - [x] Frequency display on main dashboard: Clean read-only text, no stepping buttons, no `RECORDING LOCKED` badge.
+   - [x] Channel preset list: Matching active preset shows `● RECORDING` in phosphor green.
+   - [x] Center column: Real-time BrowSDR-style spectrum and waterfall canvas is visible above the 24h timeline scrubber, reacting to audio transmission bursts.
