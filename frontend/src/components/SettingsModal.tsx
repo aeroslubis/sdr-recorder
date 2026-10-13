@@ -28,6 +28,27 @@ export interface DeviceItem {
   available: boolean;
 }
 
+export function validateFrequency(freqMHz: number, category: string): string | null {
+  if (isNaN(freqMHz) || freqMHz <= 0) {
+    return 'Please enter a valid positive frequency.';
+  }
+  if (freqMHz > 450.0) {
+    return 'Frequency exceeds allowed Ham/Airband range (Max 450.000 MHz).';
+  }
+  if (category === 'Airband') {
+    if (freqMHz < 108.0 || freqMHz > 137.0) {
+      return 'Airband frequency must be between 108.000 MHz and 137.000 MHz.';
+    }
+  } else if (category === 'Ham') {
+    const is2m = freqMHz >= 144.0 && freqMHz <= 148.0;
+    const is70cm = freqMHz >= 420.0 && freqMHz <= 450.0;
+    if (!is2m && !is70cm) {
+      return 'Ham frequency must be within 2m (144-148 MHz) or 70cm (420-450 MHz) range.';
+    }
+  }
+  return null;
+}
+
 export interface SettingsModalProps {
   isOpen: boolean;
   initialTab?: SettingsTab;
@@ -76,18 +97,38 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     { index: 0, name: 'Default RTL-SDR / Simulator', available: true },
   ]);
 
+  const refreshDevices = () => {
+    let token: string | null = null;
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        token = window.localStorage.getItem('sdr_auth_token');
+      }
+    } catch {
+      // Ignored in test environments without storage
+    }
+    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+    fetch('/api/radio/devices', { headers })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setDevices(data);
+          // If current dongleConfig.device_index doesn't match an available device, set to first device
+          setDongleConfig((prev) => {
+            if (!data.some((d: DeviceItem) => d.index === prev.device_index)) {
+              return { ...prev, device_index: data[0].index };
+            }
+            return prev;
+          });
+        }
+      })
+      .catch(() => {});
+  };
+
   useEffect(() => {
     if (isOpen) {
-      fetch('/api/radio/devices')
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data) => {
-          if (Array.isArray(data) && data.length > 0) {
-            setDevices(data);
-          }
-        })
-        .catch(() => {});
+      refreshDevices();
     }
-  }, [isOpen]);
+  }, [isOpen, activeTab]);
 
   // Tab 1: Dongle Configuration State
   const [dongleConfig, setDongleConfig] = useState<DongleHardwareConfig>({
@@ -107,6 +148,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   // Tab 2: Channel Presets Manager State
   const [showAddPreset, setShowAddPreset] = useState(false);
+  const [presetError, setPresetError] = useState<string | null>(null);
   const [presetForm, setPresetForm] = useState({
     name: '',
     frequencyMHz: '118.200',
@@ -204,7 +246,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const handleAddChannelSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!presetForm.name.trim()) return;
-    const freqHz = Math.round(parseFloat(presetForm.frequencyMHz) * 1e6);
+
+    const freqVal = parseFloat(presetForm.frequencyMHz);
+    const err = validateFrequency(freqVal, presetForm.category);
+    if (err) {
+      setPresetError(err);
+      return;
+    }
+    setPresetError(null);
+
+    const freqHz = Math.round(freqVal * 1e6);
 
     if (onSavePreset) {
       onSavePreset({
@@ -223,6 +274,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       category: 'Airband',
       squelch_threshold: -42.0,
     });
+    setPresetError(null);
     setShowAddPreset(false);
   };
 
@@ -320,9 +372,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <form onSubmit={handleSaveDongleSubmit} className="space-y-5">
               {/* Device Selector */}
               <div>
-                <label className="block text-xs font-medium text-silver-mist mb-1.5">
-                  Detected SDR Device
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-medium text-silver-mist">
+                    Detected SDR Device
+                  </label>
+                  <button
+                    type="button"
+                    onClick={refreshDevices}
+                    className="text-[11px] text-phosphor-green hover:underline cursor-pointer flex items-center gap-1 font-mono"
+                  >
+                    <span>↻ Rescan Devices</span>
+                  </button>
+                </div>
                 <select
                   value={dongleConfig.device_index ?? 0}
                   onChange={(e) =>
@@ -578,6 +639,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               {showAddPreset && (
                 <form onSubmit={handleAddChannelSubmit} className="bg-ash border border-charcoal rounded-cards p-4 space-y-3">
                   <div className="text-xs font-semibold text-snow">Add Channel Preset</div>
+
+                  {presetError && (
+                    <div
+                      className="flex items-center gap-2 p-2.5 rounded-inputs bg-red-950/40 border border-red-500/50 text-red-400 text-xs font-mono"
+                      role="alert"
+                    >
+                      <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-400" />
+                      <span>{presetError}</span>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[11px] text-silver-mist mb-1">Channel Name</label>
@@ -597,8 +669,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         step="0.001"
                         required
                         value={presetForm.frequencyMHz}
-                        onChange={(e) => setPresetForm({ ...presetForm, frequencyMHz: e.target.value })}
-                        className="w-full bg-obsidian border border-slate focus:border-phosphor-green rounded-inputs px-2.5 py-1.5 text-xs text-snow font-mono outline-none"
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setPresetForm({ ...presetForm, frequencyMHz: val });
+                          const err = validateFrequency(parseFloat(val), presetForm.category);
+                          setPresetError(err);
+                        }}
+                        className={`w-full bg-obsidian border ${
+                          presetError ? 'border-red-500' : 'border-slate focus:border-phosphor-green'
+                        } rounded-inputs px-2.5 py-1.5 text-xs text-snow font-mono outline-none`}
                       />
                     </div>
                   </div>
@@ -618,7 +697,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <label className="block text-[11px] text-silver-mist mb-1">Category</label>
                       <select
                         value={presetForm.category}
-                        onChange={(e) => setPresetForm({ ...presetForm, category: e.target.value })}
+                        onChange={(e) => {
+                          const cat = e.target.value;
+                          setPresetForm({ ...presetForm, category: cat });
+                          const err = validateFrequency(parseFloat(presetForm.frequencyMHz), cat);
+                          setPresetError(err);
+                        }}
                         className="w-full bg-obsidian border border-slate rounded-inputs px-2.5 py-1.5 text-xs text-snow outline-none"
                       >
                         <option value="Airband">Airband</option>

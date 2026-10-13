@@ -46,24 +46,15 @@ describe('TopBar', () => {
     const adminButton = screen.getByRole('button', { name: /admin/i });
     fireEvent.click(adminButton);
 
-    // Click SDR Dongle Configuration
-    fireEvent.click(screen.getByText(/SDR Dongle Configuration/i));
+    // Verify only Settings and Sign Out appear in menu
+    expect(screen.getByText(/⚙ Settings/i)).toBeInTheDocument();
+    expect(screen.getByText(/🚪 Sign Out/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Channel Setup/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Storage & Retention Manager/i)).not.toBeInTheDocument();
+
+    // Click Settings
+    fireEvent.click(screen.getByText(/⚙ Settings/i));
     expect(handleOpenSettings).toHaveBeenCalledWith('dongle');
-
-    // Open menu again & click Channel Setup
-    fireEvent.click(adminButton);
-    fireEvent.click(screen.getByText(/Channel Setup/i));
-    expect(handleOpenSettings).toHaveBeenCalledWith('channels');
-
-    // Open menu again & click Storage & Retention
-    fireEvent.click(adminButton);
-    fireEvent.click(screen.getByText(/Storage & Retention Manager/i));
-    expect(handleOpenSettings).toHaveBeenCalledWith('storage');
-
-    // Open menu again & click Change Password
-    fireEvent.click(adminButton);
-    fireEvent.click(screen.getByText(/Change Password/i));
-    expect(handleOpenSettings).toHaveBeenCalledWith('password');
 
     // Open menu again & click Sign Out
     fireEvent.click(adminButton);

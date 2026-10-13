@@ -145,11 +145,11 @@ describe('RadioTuningPanel & SMeterBar & DongleConfigModal & TopBar', () => {
     const adminButton = screen.getByRole('button', { name: /admin/i });
     fireEvent.click(adminButton);
 
-    expect(screen.getByText(/SDR Dongle Configuration/i)).toBeInTheDocument();
-    expect(screen.getByText(/Storage & Retention/i)).toBeInTheDocument();
-    expect(screen.getByText(/Sign Out/i)).toBeInTheDocument();
+    expect(screen.getByText(/⚙ Settings/i)).toBeInTheDocument();
+    expect(screen.getByText(/🚪 Sign Out/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Storage & Retention/i)).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByText(/SDR Dongle Configuration/i));
+    fireEvent.click(screen.getByText(/⚙ Settings/i));
     expect(handleOpenDongleConfig).toHaveBeenCalledTimes(1);
 
     fireEvent.click(adminButton);

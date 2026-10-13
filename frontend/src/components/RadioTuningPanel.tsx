@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { SMeterBar } from './SMeterBar';
-import { Radio, BookmarkCheck, MoreVertical, Edit2, Play, Trash2, X } from 'lucide-react';
+import { Radio, BookmarkCheck, MoreVertical, Edit2, Play, Trash2, X, AlertCircle } from 'lucide-react';
+import { validateFrequency } from './SettingsModal';
 
 export interface PresetItem {
   id?: number;
@@ -75,6 +76,7 @@ export const RadioTuningPanel: React.FC<RadioTuningPanelProps> = ({
   const [editCategory, setEditCategory] = useState('Airband');
   const [editFreqMHz, setEditFreqMHz] = useState('118.200');
   const [editMod, setEditMod] = useState('AM');
+  const [editError, setEditError] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Close 3-dots popup on click outside
@@ -102,6 +104,7 @@ export const RadioTuningPanel: React.FC<RadioTuningPanelProps> = ({
     setEditCategory(p.category || 'General');
     setEditFreqMHz((p.frequency_hz / 1e6).toFixed(4));
     setEditMod(p.modulation);
+    setEditError(null);
     setOpenMenuId(null);
   };
 
@@ -109,6 +112,12 @@ export const RadioTuningPanel: React.FC<RadioTuningPanelProps> = ({
     e.preventDefault();
     if (!editingPreset) return;
     const parsedMHz = parseFloat(editFreqMHz);
+    const err = validateFrequency(parsedMHz, editCategory);
+    if (err) {
+      setEditError(err);
+      return;
+    }
+    setEditError(null);
     const hz = !isNaN(parsedMHz) ? Math.round(parsedMHz * 1e6) : editingPreset.frequency_hz;
 
     const updated: PresetItem = {
@@ -222,6 +231,17 @@ export const RadioTuningPanel: React.FC<RadioTuningPanelProps> = ({
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>
+
+              {editError && (
+                <div
+                  className="flex items-center gap-1.5 p-2 rounded bg-red-950/40 border border-red-500/50 text-red-400 text-[11px] font-mono"
+                  role="alert"
+                >
+                  <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 text-red-400" />
+                  <span>{editError}</span>
+                </div>
+              )}
+
               <input
                 type="text"
                 value={editName}

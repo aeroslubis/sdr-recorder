@@ -62,6 +62,14 @@ async def tune_radio(
     db: sqlite3.Connection = Depends(get_db),
 ) -> Dict[str, Any]:
     """Update frequency, modulation, squelch, and RF gain parameters."""
+    if payload.frequency_hz is not None:
+        freq_mhz = payload.frequency_hz / 1e6
+        if freq_mhz > 450.0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Frequency exceeds allowed Ham/Airband range (Max 450.000 MHz)",
+            )
+
     updates = {k: v for k, v in payload.model_dump().items() if v is not None}
     cursor = db.cursor()
 
@@ -122,7 +130,28 @@ def get_presets(db: sqlite3.Connection = Depends(get_db)) -> List[Dict[str, Any]
 
 @router.post("/presets", response_model=PresetModel)
 def create_preset(payload: PresetCreate, db: sqlite3.Connection = Depends(get_db)) -> Dict[str, Any]:
-    """Create a new channel preset."""
+    """Create a new channel preset with Ham/Airband range validation."""
+    freq_mhz = payload.frequency_hz / 1e6
+    if freq_mhz > 450.0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Frequency exceeds allowed Ham/Airband range (Max 450.000 MHz)",
+        )
+    if payload.category == "Airband":
+        if freq_mhz < 108.0 or freq_mhz > 137.0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Airband frequency must be between 108.000 MHz and 137.000 MHz",
+            )
+    elif payload.category == "Ham":
+        is_2m = 144.0 <= freq_mhz <= 148.0
+        is_70cm = 420.0 <= freq_mhz <= 450.0
+        if not (is_2m or is_70cm):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Ham frequency must be within 2m (144-148 MHz) or 70cm (420-450 MHz) range",
+            )
+
     cursor = db.cursor()
     cursor.execute(
         """

@@ -82,4 +82,60 @@ describe('SettingsModal', () => {
       gain_mode: 'manual',
     }));
   });
+
+  test('validates frequency ranges correctly and displays error alert in UI when frequency exceeds Ham/Airband range', () => {
+    const handleSavePreset = jest.fn();
+    render(
+      <SettingsModal
+        isOpen={true}
+        initialTab="channels"
+        onClose={jest.fn()}
+        onSaveDongle={jest.fn()}
+        onSaveStorage={jest.fn()}
+        onChangePassword={jest.fn()}
+        presets={[]}
+        onSavePreset={handleSavePreset}
+      />
+    );
+
+    // Click Add New Channel
+    fireEvent.click(screen.getByText(/Add New Channel/i));
+
+    const nameInput = screen.getByPlaceholderText(/e\.g\. Tower 1/i);
+    const freqInput = screen.getByDisplayValue('118.200');
+    const saveButton = screen.getByRole('button', { name: /Save Channel/i });
+
+    // Enter channel name
+    fireEvent.change(nameInput, { target: { value: 'High Band Test' } });
+
+    // Enter frequency above Ham/Airband range (e.g. 500 MHz)
+    fireEvent.change(freqInput, { target: { value: '500.000' } });
+
+    // Error alert should be displayed
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(screen.getByText(/Frequency exceeds allowed Ham\/Airband range/i)).toBeInTheDocument();
+
+    // Trying to save should fail and not call onSavePreset
+    fireEvent.click(saveButton);
+    expect(handleSavePreset).not.toHaveBeenCalled();
+
+    // Test Airband out-of-range (e.g. 150 MHz while Category is Airband)
+    fireEvent.change(freqInput, { target: { value: '150.000' } });
+    expect(screen.getByText(/Airband frequency must be between 108.000 MHz and 137.000 MHz/i)).toBeInTheDocument();
+    fireEvent.click(saveButton);
+    expect(handleSavePreset).not.toHaveBeenCalled();
+
+    // Valid Airband frequency (e.g. 121.500)
+    fireEvent.change(freqInput, { target: { value: '121.500' } });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+    fireEvent.click(saveButton);
+    expect(handleSavePreset).toHaveBeenCalledWith({
+      name: 'High Band Test',
+      frequency_hz: 121500000,
+      modulation: 'AM',
+      category: 'Airband',
+      squelch_threshold: -42.0,
+    });
+  });
 });

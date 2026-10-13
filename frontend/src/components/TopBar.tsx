@@ -3,8 +3,6 @@ import {
   Radio,
   HardDrive,
   ChevronDown,
-  Database,
-  KeyRound,
   LogOut,
   Sliders,
 } from 'lucide-react';
@@ -147,41 +145,14 @@ export const TopBar: React.FC<TopBarProps> = ({
           </button>
 
           {menuOpen && (
-            <div className="absolute right-0 mt-2 w-56 bg-ash border border-charcoal rounded-cards shadow-sm py-1.5 z-50 text-xs">
+            <div className="absolute right-0 mt-2 w-48 bg-ash border border-charcoal rounded-cards shadow-sm py-1.5 z-50 text-xs">
               <button
                 type="button"
                 onClick={() => handleOpenTab('dongle')}
                 className="w-full flex items-center gap-2.5 px-4 py-2 text-silver-mist hover:text-snow hover:bg-charcoal text-left transition-colors cursor-pointer"
               >
-                <Sliders className="w-4 h-4 text-smoke" />
-                <span>⚙ SDR Dongle Configuration</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleOpenTab('channels')}
-                className="w-full flex items-center gap-2.5 px-4 py-2 text-silver-mist hover:text-snow hover:bg-charcoal text-left transition-colors cursor-pointer"
-              >
-                <Radio className="w-4 h-4 text-smoke" />
-                <span>📻 Channel Setup</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleOpenTab('storage')}
-                className="w-full flex items-center gap-2.5 px-4 py-2 text-silver-mist hover:text-snow hover:bg-charcoal text-left transition-colors cursor-pointer"
-              >
-                <Database className="w-4 h-4 text-smoke" />
-                <span>🗄 Storage & Retention Manager</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleOpenTab('password')}
-                className="w-full flex items-center gap-2.5 px-4 py-2 text-silver-mist hover:text-snow hover:bg-charcoal text-left transition-colors cursor-pointer"
-              >
-                <KeyRound className="w-4 h-4 text-smoke" />
-                <span>🔑 Change Password</span>
+                <Sliders className="w-4 h-4 text-phosphor-green" />
+                <span>⚙ Settings</span>
               </button>
 
               <div className="my-1 border-t border-charcoal" />
