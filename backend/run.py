@@ -66,7 +66,22 @@ def main():
     parser.add_argument("--port", type=int, default=int(os.environ.get("SDR_PORT", "8000")), help="Port to bind (default: 8000)")
     parser.add_argument("--simulator", action="store_true", help="Force Mock SDR Simulator mode")
     parser.add_argument("--reload", action="store_true", help="Enable uvicorn auto-reload")
+    parser.add_argument("--reset-password", action="store_true", help="Reset admin password to default (12345) and exit")
     args = parser.parse_args()
+
+    if args.reset_password:
+        from backend.database import get_connection, init_db
+        from backend.models import hash_password
+        import backend.config as app_config
+        init_db()
+        conn = get_connection()
+        cursor = conn.cursor()
+        new_hash = hash_password(app_config.DEFAULT_ADMIN_PASSWORD)
+        cursor.execute("UPDATE users SET password_hash = ? WHERE username = ?", (new_hash, app_config.DEFAULT_ADMIN_USERNAME))
+        conn.commit()
+        conn.close()
+        print(f"[✓] Successfully reset password for '{app_config.DEFAULT_ADMIN_USERNAME}' to default '{app_config.DEFAULT_ADMIN_PASSWORD}'.")
+        return
 
     force_sim = args.simulator or os.environ.get("SDR_FORCE_SIMULATOR", "").lower() in ["1", "true", "yes"]
 
