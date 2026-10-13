@@ -55,7 +55,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
           <Radio className="w-8 h-8 text-phosphor-green relative z-10 animate-pulse" />
         </div>
         <h1 className="text-2xl font-medium tracking-tight text-snow">
-          SDR-Recorder <span className="text-phosphor-green font-normal">NVR</span>
+          SDR <span className="text-phosphor-green font-normal">RECORDER</span>
         </h1>
         <p className="text-sm text-smoke mt-1">
           Radio Communications Recording & Monitoring
@@ -153,7 +153,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
       </div>
 
       <div className="mt-8 text-xs text-smoke font-mono">
-        v1.0.0 · CCTV NVR Architecture
+        v1.0.0 · Continuous Radio Monitoring & Archiving System
       </div>
     </div>
   );

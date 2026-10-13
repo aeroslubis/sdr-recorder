@@ -3,11 +3,12 @@ import {
   Radio,
   HardDrive,
   ChevronDown,
-  Settings,
   Database,
   KeyRound,
   LogOut,
+  Sliders,
 } from 'lucide-react';
+import { SettingsTab } from './SettingsModal';
 
 export interface TopBarProps {
   frequencyHz?: number;
@@ -16,6 +17,7 @@ export interface TopBarProps {
   diskUsedGB?: number;
   diskTotalGB?: number;
   username?: string;
+  onOpenSettings?: (tab: SettingsTab) => void;
   onOpenDongleConfig?: () => void;
   onOpenStorageManager?: () => void;
   onChangePassword?: () => void;
@@ -30,6 +32,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   diskUsedGB = 14.8,
   diskTotalGB = 100,
   username = 'admin',
+  onOpenSettings,
   onOpenDongleConfig,
   onOpenStorageManager,
   onChangePassword,
@@ -50,6 +53,17 @@ export const TopBar: React.FC<TopBarProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const handleOpenTab = (tab: SettingsTab) => {
+    setMenuOpen(false);
+    if (onOpenSettings) {
+      onOpenSettings(tab);
+    } else {
+      if (tab === 'dongle') onOpenDongleConfig?.();
+      if (tab === 'storage') onOpenStorageManager?.();
+      if (tab === 'password') onChangePassword?.();
+    }
+  };
+
   const diskPercent = Math.min(100, Math.round((diskUsedGB / (diskTotalGB || 1)) * 100));
   const freqMHz = (frequencyHz / 1e6).toFixed(3);
 
@@ -65,7 +79,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             <Radio className="w-4 h-4 text-phosphor-green animate-pulse" />
           </div>
           <span className="font-medium text-snow text-lg tracking-tight">
-            [●] SDR-NVR
+            [●] SDR RECORDER
           </span>
         </div>
 
@@ -79,7 +93,7 @@ export const TopBar: React.FC<TopBarProps> = ({
 
       {/* Center / Right System Metrics */}
       <div className="flex items-center gap-5">
-        {/* Hardware Status Pill */}
+        {/* Hardware Status Pill (Clean single colored indicator dot without duplicate white icon) */}
         <div className="flex items-center gap-1.5 px-3 py-1 bg-ash border border-charcoal rounded-pill text-xs font-mono">
           <div
             className={`w-2 h-2 rounded-full ${
@@ -87,7 +101,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             }`}
           />
           <span className={isSimulator ? 'text-amber-400' : 'text-silver-mist'}>
-            {isSimulator ? '● SIMULATOR MODE' : '● RTL-SDR ONLINE'}
+            {isSimulator ? 'SIMULATOR MODE' : 'RTL-SDR ONLINE'}
           </span>
         </div>
 
@@ -136,22 +150,25 @@ export const TopBar: React.FC<TopBarProps> = ({
             <div className="absolute right-0 mt-2 w-56 bg-ash border border-charcoal rounded-cards shadow-sm py-1.5 z-50 text-xs">
               <button
                 type="button"
-                onClick={() => {
-                  setMenuOpen(false);
-                  onOpenDongleConfig?.();
-                }}
+                onClick={() => handleOpenTab('dongle')}
                 className="w-full flex items-center gap-2.5 px-4 py-2 text-silver-mist hover:text-snow hover:bg-charcoal text-left transition-colors cursor-pointer"
               >
-                <Settings className="w-4 h-4 text-smoke" />
+                <Sliders className="w-4 h-4 text-smoke" />
                 <span>⚙ SDR Dongle Configuration</span>
               </button>
 
               <button
                 type="button"
-                onClick={() => {
-                  setMenuOpen(false);
-                  onOpenStorageManager?.();
-                }}
+                onClick={() => handleOpenTab('channels')}
+                className="w-full flex items-center gap-2.5 px-4 py-2 text-silver-mist hover:text-snow hover:bg-charcoal text-left transition-colors cursor-pointer"
+              >
+                <Radio className="w-4 h-4 text-smoke" />
+                <span>📻 Channel Setup</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleOpenTab('storage')}
                 className="w-full flex items-center gap-2.5 px-4 py-2 text-silver-mist hover:text-snow hover:bg-charcoal text-left transition-colors cursor-pointer"
               >
                 <Database className="w-4 h-4 text-smoke" />
@@ -160,10 +177,7 @@ export const TopBar: React.FC<TopBarProps> = ({
 
               <button
                 type="button"
-                onClick={() => {
-                  setMenuOpen(false);
-                  onChangePassword?.();
-                }}
+                onClick={() => handleOpenTab('password')}
                 className="w-full flex items-center gap-2.5 px-4 py-2 text-silver-mist hover:text-snow hover:bg-charcoal text-left transition-colors cursor-pointer"
               >
                 <KeyRound className="w-4 h-4 text-smoke" />

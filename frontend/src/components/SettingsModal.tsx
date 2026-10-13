@@ -9,7 +9,6 @@ import {
   AlertCircle,
   Plus,
   Trash2,
-  Edit2,
   Save,
 } from 'lucide-react';
 import { PresetItem } from './RadioTuningPanel';
@@ -107,7 +106,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [dongleSaved, setDongleSaved] = useState(false);
 
   // Tab 2: Channel Presets Manager State
-  const [editingPresetId, setEditingPresetId] = useState<number | null>(null);
   const [showAddPreset, setShowAddPreset] = useState(false);
   const [presetForm, setPresetForm] = useState({
     name: '',

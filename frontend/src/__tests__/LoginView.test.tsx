@@ -5,6 +5,8 @@ describe('LoginView Component', () => {
   test('renders login view with default credentials hint in english', () => {
     render(<LoginView onLogin={jest.fn()} />);
     expect(screen.getByText(/Default credentials: admin \/ 12345/i)).toBeInTheDocument();
+    expect(screen.getByText(/RECORDER/i)).toBeInTheDocument();
+    expect(screen.getByText(/Continuous Radio Monitoring & Archiving System/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument();

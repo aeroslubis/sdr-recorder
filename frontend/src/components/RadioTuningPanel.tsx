@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { SMeterBar } from './SMeterBar';
-import { Radio, BookmarkCheck, MoreVertical, Edit2, Play, Trash2, Check, X } from 'lucide-react';
+import { Radio, BookmarkCheck, MoreVertical, Edit2, Play, Trash2, X } from 'lucide-react';
 
 export interface PresetItem {
   id?: number;
@@ -65,7 +65,6 @@ export const RadioTuningPanel: React.FC<RadioTuningPanelProps> = ({
   ppmOffset = 0,
   presets = DEFAULT_PRESETS,
   onTune,
-  onCreatePreset,
   onUpdatePreset,
   onDeletePreset,
   className = '',

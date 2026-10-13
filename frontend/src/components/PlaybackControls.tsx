@@ -48,7 +48,7 @@ export const PlaybackControls: React.FC<PlaybackControlsProps> = ({
   return (
     <div
       className={`bg-ash/90 backdrop-blur border border-charcoal rounded-cards px-4 py-3 flex flex-wrap items-center justify-between gap-4 select-none ${className}`}
-      aria-label="NVR Playback Controls"
+      aria-label="Audio Playback Controls"
     >
       {/* Left: Transport buttons */}
       <div className="flex items-center gap-2">

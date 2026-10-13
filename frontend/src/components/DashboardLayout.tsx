@@ -5,7 +5,9 @@ import { RadioTuningPanel, PresetItem } from './RadioTuningPanel';
 import { TimelineScrubber, TransmissionInterval } from './TimelineScrubber';
 import { PlaybackControls } from './PlaybackControls';
 import { CallLogPanel, CallLogItem } from './CallLogPanel';
-import { DongleConfigModal, DongleHardwareConfig } from './DongleConfigModal';
+import { SettingsModal, SettingsTab, StorageSettings } from './SettingsModal';
+import { LiveSpectrumVisualizer } from './LiveSpectrumVisualizer';
+import { DongleHardwareConfig } from './DongleConfigModal';
 import { WebAudioPlayer } from '../audio/WebAudioPlayer';
 import { formatDate } from './HistoryDatePicker';
 import { Volume2, VolumeX, Filter } from 'lucide-react';
@@ -17,7 +19,7 @@ export interface DashboardLayoutProps {
 export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = '' }) => {
   const { user, token, logout } = useAuth();
 
-  // Selected date for NVR playback
+  // Selected date for playback
   const [selectedDate, setSelectedDate] = useState<string>(() => formatDate(new Date()));
   const [activeDates, setActiveDates] = useState<string[]>([]);
 
@@ -49,8 +51,14 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
   const [volume, setVolume] = useState<number>(1.0);
   const [activeCallTitle, setActiveCallTitle] = useState<string>('');
 
-  // Modals
-  const [isDongleModalOpen, setIsDongleModalOpen] = useState<boolean>(false);
+  // Unified Settings Modal
+  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>('dongle');
+  const [storageSettings, setStorageSettings] = useState<StorageSettings>({
+    retention_days: 14,
+    max_disk_usage_percent: 90,
+    audio_format: 'opus',
+  });
 
   // Audio player ref
   const audioPlayerRef = useRef<WebAudioPlayer | null>(null);
@@ -75,7 +83,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
     };
   }, []);
 
-  // Sync volume, speed, dsp filter with audio player
   useEffect(() => {
     if (audioPlayerRef.current) {
       audioPlayerRef.current.setVolume(volume);
@@ -106,7 +113,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
     [token]
   );
 
-  // Fetch initial Radio status & presets
+  // Fetch initial Radio status, presets, active dates & system storage settings
   useEffect(() => {
     authFetch('/api/radio/status')
       .then((res) => (res.ok ? res.json() : null))
@@ -133,6 +140,13 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
       .then((res) => (res.ok ? res.json() : []))
       .then((data: string[]) => {
         if (Array.isArray(data)) setActiveDates(data);
+      })
+      .catch(() => {});
+
+    authFetch('/api/system/settings')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setStorageSettings(data);
       })
       .catch(() => {});
   }, [authFetch]);
@@ -171,13 +185,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
       wsRef.current = socket;
 
       socket.onopen = () => {
-        if (token) {
-          socket.send(JSON.stringify({ type: 'auth', token }));
+        if (!isCancelled) {
+          socket.send(JSON.stringify({ type: 'ping' }));
         }
       };
 
       socket.onmessage = (event) => {
-        if (isCancelled) return;
         if (typeof event.data === 'string') {
           try {
             const msg = JSON.parse(event.data);
@@ -188,18 +201,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
               if (msg.frequency_hz !== undefined) setFrequencyHz(msg.frequency_hz);
               if (msg.modulation !== undefined) setModulation(msg.modulation);
             }
-          } catch {
-            // Ignore parse errors on binary frames
-          }
+          } catch {}
         }
       };
 
-      socket.onerror = () => {
-        // Suppress unhandled ws errors in test
-      };
-    } catch {
-      // Graceful fallback if WebSocket unavailable
-    }
+      socket.onerror = () => {};
+    } catch {}
 
     return () => {
       isCancelled = true;
@@ -210,7 +217,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
     };
   }, [token]);
 
-  // Tune Radio Handler
+  // Handle Radio Tuning
   const handleTune = async (params: {
     frequencyHz?: number;
     modulation?: string;
@@ -218,133 +225,149 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
     rfGain?: number;
     ppmOffset?: number;
   }) => {
-    if (params.frequencyHz !== undefined) setFrequencyHz(params.frequencyHz);
-    if (params.modulation !== undefined) setModulation(params.modulation);
-    if (params.squelchThreshold !== undefined) setSquelchThreshold(params.squelchThreshold);
-    if (params.rfGain !== undefined) setRfGain(params.rfGain);
-    if (params.ppmOffset !== undefined) setPpmOffset(params.ppmOffset);
-
     try {
-      await authFetch('/api/radio/tune', {
+      const res = await authFetch('/api/radio/tune', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(params),
+        body: JSON.stringify({
+          frequency_hz: params.frequencyHz,
+          modulation: params.modulation,
+          squelch_threshold: params.squelchThreshold,
+          rf_gain: params.rfGain,
+          ppm_offset: params.ppmOffset,
+        }),
       });
-    } catch {
-      // Local state is already updated
-    }
+      if (res.ok) {
+        const data = await res.json();
+        if (data.frequency_hz) setFrequencyHz(data.frequency_hz);
+        if (data.modulation) setModulation(data.modulation);
+        if (data.squelch_threshold !== undefined) setSquelchThreshold(data.squelch_threshold);
+        if (data.rf_gain !== undefined) setRfGain(data.rf_gain);
+        if (data.ppm_offset !== undefined) setPpmOffset(data.ppm_offset);
+      }
+    } catch {}
   };
 
-  // Preset Handlers
-  const handleCreatePreset = async (newPreset: Omit<PresetItem, 'id'>) => {
+  // Presets Handlers
+  const handleCreatePreset = async (preset: Omit<PresetItem, 'id'> | PresetItem) => {
     try {
       const res = await authFetch('/api/radio/presets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newPreset),
+        body: JSON.stringify(preset),
       });
       if (res.ok) {
-        const created = await res.json();
-        setPresets((prev) => [...prev, created]);
+        const saved = await res.json();
+        setPresets((prev) => [...prev.filter((p) => p.id !== saved.id), saved]);
       }
     } catch {}
   };
 
-  const handleDeletePreset = async (id: number) => {
+  const handleDeletePreset = async (presetId: number) => {
     try {
-      await authFetch(`/api/radio/presets/${id}`, { method: 'DELETE' });
-      setPresets((prev) => prev.filter((p) => p.id !== id));
-    } catch {}
-  };
-
-  // Play Audio for a Call
-  const handlePlayCall = async (call: CallLogItem) => {
-    setSelectedCallId(call.id);
-    const timeDisplay = call.startTime || call.start_time || '';
-    const durDisplay = (call.durationSec ?? call.duration_sec ?? 0).toFixed(1);
-    setActiveCallTitle(`Call #${call.id} · ${timeDisplay} (${durDisplay}s)`);
-
-    // Match timeline transmission start_ms to position scrubber
-    const matchingTx = timelineTransmissions.find((t) => t.id === call.id);
-    if (matchingTx) {
-      setCurrentTimeMs(matchingTx.start_ms);
-    }
-
-    if (audioPlayerRef.current) {
-      const audioUrl = `/api/recordings/${call.id}/audio${token ? `?token=${encodeURIComponent(token)}` : ''}`;
-      try {
-        await audioPlayerRef.current.playUrl(audioUrl);
-      } catch {
-        // Player error handler catches this
+      const res = await authFetch(`/api/radio/presets/${presetId}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        setPresets((prev) => prev.filter((p) => p.id !== presetId));
       }
-    }
-  };
-
-  // Star Toggle Handler
-  const handleToggleStar = async (callId: number, nextStarred: boolean) => {
-    setCalls((prev) =>
-      prev.map((c) => (c.id === callId ? { ...c, isStarred: nextStarred, is_starred: nextStarred ? 1 : 0 } : c))
-    );
-    try {
-      await authFetch(`/api/recordings/${callId}/star`, { method: 'POST' });
     } catch {}
   };
 
-  // Play / Pause transport toggle
-  const handlePlayPause = () => {
-    if (!audioPlayerRef.current) return;
-    if (isPlaying) {
-      audioPlayerRef.current.pause();
-    } else {
-      audioPlayerRef.current.play().catch(() => {});
-    }
-  };
-
-  // Prev / Next call buttons
-  const handlePrevCall = () => {
-    if (calls.length === 0) return;
-    const curIndex = calls.findIndex((c) => c.id === selectedCallId);
-    const prevIndex = curIndex > 0 ? curIndex - 1 : calls.length - 1;
-    handlePlayCall(calls[prevIndex]);
-  };
-
-  const handleNextCall = () => {
-    if (calls.length === 0) return;
-    const curIndex = calls.findIndex((c) => c.id === selectedCallId);
-    const nextIndex = curIndex >= 0 && curIndex < calls.length - 1 ? curIndex + 1 : 0;
-    handlePlayCall(calls[nextIndex]);
-  };
-
-  // Timeline Seeker
+  // Timeline & Playback
   const handleTimelineSeek = (timeMs: number) => {
     setCurrentTimeMs(timeMs);
-    // Find transmission intersecting or closest to timeMs
-    const tx = timelineTransmissions.find((t) => timeMs >= t.start_ms && timeMs <= t.end_ms);
-    if (tx) {
-      setSelectedCallId(tx.id);
-      const call = calls.find((c) => c.id === tx.id);
-      if (call) {
-        setActiveCallTitle(`Call #${tx.id} · ${call.startTime || call.start_time || ''}`);
-      }
+    const matched = timelineTransmissions.find(
+      (t) => timeMs >= t.start_ms && timeMs <= t.end_ms
+    );
+    if (matched) {
+      handleSelectTransmission(matched.id);
     }
   };
 
-  // Timeline Transmission Selection
   const handleSelectTransmission = (id: number) => {
     setSelectedCallId(id);
     const call = calls.find((c) => c.id === id);
     if (call) {
-      handlePlayCall(call);
+      const freq = ((call.frequency_hz || call.frequencyHz || 0) / 1e6).toFixed(3);
+      const time = (call.start_time || call.startTime || '').slice(11, 19);
+      setActiveCallTitle(`${freq} MHz · ${time}`);
+    }
+    const matchedInterval = timelineTransmissions.find((t) => t.id === id);
+    if (matchedInterval) {
+      setCurrentTimeMs(matchedInterval.start_ms);
     }
   };
 
-  // Export current clip
-  const handleExportClip = () => {
-    if (!selectedCallId) return;
-    const downloadUrl = `/api/recordings/${selectedCallId}/audio${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+  const handlePlayCall = async (id: number) => {
+    handleSelectTransmission(id);
+    const audioUrl = `/api/recordings/${id}/audio`;
+    if (audioPlayerRef.current) {
+      try {
+        await audioPlayerRef.current.playUrl(audioUrl);
+      } catch {}
+    }
+  };
+
+  const handlePlayPause = async () => {
+    if (!audioPlayerRef.current) return;
+    if (isPlaying) {
+      audioPlayerRef.current.pause();
+    } else {
+      if (selectedCallId) {
+        const audioUrl = `/api/recordings/${selectedCallId}/audio`;
+        try {
+          await audioPlayerRef.current.playUrl(audioUrl);
+        } catch {}
+      } else if (calls.length > 0) {
+        handlePlayCall(calls[0].id);
+      }
+    }
+  };
+
+  const handlePrevCall = () => {
+    if (!calls.length) return;
+    const currentIndex = calls.findIndex((c) => c.id === selectedCallId);
+    if (currentIndex > 0) {
+      handlePlayCall(calls[currentIndex - 1].id);
+    } else {
+      handlePlayCall(calls[0].id);
+    }
+  };
+
+  const handleNextCall = () => {
+    if (!calls.length) return;
+    const currentIndex = calls.findIndex((c) => c.id === selectedCallId);
+    if (currentIndex >= 0 && currentIndex < calls.length - 1) {
+      handlePlayCall(calls[currentIndex + 1].id);
+    } else if (calls.length > 0) {
+      handlePlayCall(calls[calls.length - 1].id);
+    }
+  };
+
+  const handleToggleStar = async (id: number) => {
+    try {
+      const res = await authFetch(`/api/recordings/${id}/star`, {
+        method: 'POST',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCalls((prev) =>
+          prev.map((c) => (c.id === id ? { ...c, is_starred: data.is_starred } : c))
+        );
+        setTimelineTransmissions((prev) =>
+          prev.map((t) => (t.id === id ? { ...t, is_starred: data.is_starred } : t))
+        );
+      }
+    } catch {}
+  };
+
+  const handleExportClip = (id?: number) => {
+    const targetId = id || selectedCallId;
+    if (!targetId) return;
     const a = document.createElement('a');
-    a.href = downloadUrl;
-    a.download = `transmission-${selectedCallId}.opus`;
+    a.href = `/api/recordings/${targetId}/audio`;
+    a.download = `transmission_${targetId}.wav`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -367,8 +390,38 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newConfig),
       });
-      setIsDongleModalOpen(false);
+      if (newConfig.rf_gain !== undefined) setRfGain(newConfig.rf_gain);
+      if (newConfig.ppm_offset !== undefined) setPpmOffset(newConfig.ppm_offset);
     } catch {}
+  };
+
+  // Storage Save Config Handler
+  const handleSaveStorageConfig = async (newSettings: StorageSettings) => {
+    try {
+      const res = await authFetch('/api/system/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newSettings),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setStorageSettings(data);
+      }
+    } catch {}
+  };
+
+  // Change Password Handler
+  const handleChangePassword = async (passwords: { old_password: string; new_password: string }) => {
+    const res = await authFetch('/api/auth/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(passwords),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      return { success: false, error: data.detail || 'Failed to change password' };
+    }
+    return { success: true };
   };
 
   return (
@@ -379,7 +432,10 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
         modulation={modulation}
         isSimulator={isSimulator}
         username={user?.username || 'admin'}
-        onOpenDongleConfig={() => setIsDongleModalOpen(true)}
+        onOpenSettings={(tab) => {
+          setSettingsTab(tab);
+          setIsSettingsOpen(true);
+        }}
         onLogout={logout}
       />
 
@@ -398,12 +454,13 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
             presets={presets}
             onTune={handleTune}
             onCreatePreset={handleCreatePreset}
+            onUpdatePreset={handleCreatePreset}
             onDeletePreset={handleDeletePreset}
           />
         </div>
 
-        {/* Center Column: Live Monitor, Timeline Scrubber & Playback Controls */}
-        <main className="flex-1 flex flex-col overflow-y-auto p-4 md:p-6 gap-5 bg-obsidian">
+        {/* Center Column: Live Monitor, Spectrum, Timeline Scrubber & Playback Controls */}
+        <main className="flex-1 flex flex-col overflow-y-auto p-4 md:p-6 gap-4 bg-obsidian">
           {/* Live Audio Monitor & Telemetry Bar */}
           <div className="bg-ash/80 backdrop-blur border border-charcoal rounded-cards px-4 py-3 flex flex-wrap items-center justify-between gap-3 select-none">
             {/* Live Reception Status */}
@@ -470,8 +527,17 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
             </div>
           </div>
 
+          {/* Live SDR Spectrum Visualizer (Spectrum only, positioned directly above 24h timeline) */}
+          <LiveSpectrumVisualizer
+            frequencyHz={frequencyHz}
+            modulation={modulation}
+            squelchOpen={squelchOpen}
+            rssi={liveRssi}
+            analyserNode={audioPlayerRef.current?.getAnalyser() ?? null}
+          />
+
           {/* 24-Hour Canvas Timeline Scrubber */}
-          <div className="flex-1 flex flex-col min-h-[300px]">
+          <div className="flex-1 flex flex-col min-h-[280px]">
             <TimelineScrubber
               date={selectedDate}
               transmissions={timelineTransmissions}
@@ -508,22 +574,29 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
           currentDate={selectedDate}
           onDateChange={setSelectedDate}
           activeDates={activeDates}
-          onPlay={handlePlayCall}
+          onPlay={(call) => handlePlayCall(call.id)}
           onToggleStar={handleToggleStar}
           onSelectCall={handleSelectTransmission}
           onDownload={handleExportClip}
         />
       </div>
 
-      {/* Dongle Configuration Modal */}
-      <DongleConfigModal
-        isOpen={isDongleModalOpen}
-        onClose={() => setIsDongleModalOpen(false)}
-        onSave={handleSaveDongleConfig}
-        initialConfig={{
+      {/* Unified Multi-Tab Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        initialTab={settingsTab}
+        onClose={() => setIsSettingsOpen(false)}
+        onSaveDongle={handleSaveDongleConfig}
+        onSaveStorage={handleSaveStorageConfig}
+        onChangePassword={handleChangePassword}
+        presets={presets}
+        onSavePreset={handleCreatePreset}
+        onDeletePreset={handleDeletePreset}
+        initialDongleConfig={{
           rf_gain: rfGain,
           ppm_offset: ppmOffset,
         }}
+        initialStorageSettings={storageSettings}
       />
     </div>
   );

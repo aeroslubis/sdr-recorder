@@ -44,9 +44,11 @@ export class WebAudioPlayer {
       this.gainNode = this.audioContext.createGain();
       this.gainNode.gain.setValueAtTime(this.volume, this.audioContext.currentTime);
 
-      this.analyserNode = this.audioContext.createAnalyser();
-      this.analyserNode.fftSize = 256;
-      this.analyserNode.smoothingTimeConstant = 0.8;
+      if (typeof this.audioContext.createAnalyser === 'function') {
+        this.analyserNode = this.audioContext.createAnalyser();
+        this.analyserNode.fftSize = 256;
+        this.analyserNode.smoothingTimeConstant = 0.8;
+      }
 
       this.filterNode = this.audioContext.createBiquadFilter();
       this.filterNode.type = 'bandpass';
