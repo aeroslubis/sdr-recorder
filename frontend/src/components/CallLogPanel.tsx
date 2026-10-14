@@ -120,7 +120,7 @@ export const CallLogPanel: React.FC<CallLogPanelProps> = ({
     } else {
       // Default download link fallback
       const token = localStorage.getItem('sdr_auth_token') || sessionStorage.getItem('sdr_auth_token');
-      const downloadUrl = `/api/recordings/${id}/audio${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+      const downloadUrl = `/api/recordings/${id}/audio?download=true${token ? `&token=${encodeURIComponent(token)}` : ''}`;
       const a = document.createElement('a');
       a.href = downloadUrl;
       a.download = `transmission-${id}.opus`;

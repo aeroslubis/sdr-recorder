@@ -173,11 +173,12 @@ def list_recordings(
 def get_recording_audio(
     id: int,
     request: Request,
+    download: bool = Query(False, description="If true, sets Content-Disposition attachment header"),
     db: sqlite3.Connection = Depends(get_db),
 ) -> Response:
     """
     Streams audio recording file with HTTP 206 Partial Content Range support
-    for scrubbing and instant HTML5 audio playback.
+    for scrubbing and instant HTML5 audio playback, or triggers direct attachment download.
     """
     cursor = db.cursor()
     cursor.execute("SELECT file_path FROM transmissions WHERE id = ?", (id,))
@@ -213,7 +214,14 @@ def get_recording_audio(
             "Content-Length": str(file_size),
             "Content-Type": content_type,
         }
-        return FileResponse(path=str(file_path), media_type=content_type, headers=headers)
+        if download:
+            headers["Content-Disposition"] = f'attachment; filename="{file_path.name}"'
+        return FileResponse(
+            path=str(file_path),
+            media_type=content_type,
+            headers=headers,
+            filename=file_path.name if download else None,
+        )
 
     # Parse Range Header: bytes=start-end
     range_val = range_header.strip().lower()

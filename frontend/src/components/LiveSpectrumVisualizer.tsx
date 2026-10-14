@@ -210,24 +210,6 @@ export const LiveSpectrumVisualizer: React.FC<LiveSpectrumVisualizerProps> = ({
         ctx.fillRect(x, peakY - 1, barWidth, 1.5);
       }
 
-      // Center Tuning Needle (Down exact center of carrier)
-      const centerX = width / 2;
-      ctx.strokeStyle = !curHwConnected ? '#ef4444' : '#3ecf8e';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(centerX, 0);
-      ctx.lineTo(centerX, plotHeight);
-      ctx.stroke();
-
-      // Triangle marker ▼ at top
-      ctx.fillStyle = !curHwConnected ? '#ef4444' : '#3ecf8e';
-      ctx.beginPath();
-      ctx.moveTo(centerX - 4, 0);
-      ctx.lineTo(centerX + 4, 0);
-      ctx.lineTo(centerX, 6);
-      ctx.closePath();
-      ctx.fill();
-
       // Bottom Frequency Axis Ruler (22px)
       ctx.fillStyle = '#161616';
       ctx.fillRect(0, plotHeight, width, rulerHeight);
@@ -245,7 +227,7 @@ export const LiveSpectrumVisualizer: React.FC<LiveSpectrumVisualizerProps> = ({
       const ticks = [
         { frac: 0.06, label: `${(f0MHz - 0.045).toFixed(4)}`, sub: '-45k' },
         { frac: 0.28, label: `${(f0MHz - 0.0225).toFixed(4)}`, sub: '-22.5k' },
-        { frac: 0.50, label: `${f0MHz.toFixed(4)} MHz (f₀)`, isCenter: true },
+        { frac: 0.50, label: `${f0MHz.toFixed(4)}`, isCenter: true },
         { frac: 0.72, label: `${(f0MHz + 0.0225).toFixed(4)}`, sub: '+22.5k' },
         { frac: 0.94, label: `${(f0MHz + 0.045).toFixed(4)}`, sub: '+45k' },
       ];
@@ -311,13 +293,13 @@ export const LiveSpectrumVisualizer: React.FC<LiveSpectrumVisualizerProps> = ({
         </div>
       </div>
 
-      {/* Spectrum Canvas: Taller height (h-36 / 144px) */}
-      <div className="w-full h-36 bg-obsidian rounded-inputs overflow-hidden border border-charcoal/60 relative">
+      {/* Spectrum Canvas: Enlarged height (h-52 / 208px) */}
+      <div className="w-full h-52 bg-obsidian rounded-inputs overflow-hidden border border-charcoal/60 relative">
         <canvas
           ref={canvasRef}
           data-testid="sdr-spectrum-canvas"
           width={800}
-          height={144}
+          height={208}
           className="w-full h-full block"
         />
       </div>

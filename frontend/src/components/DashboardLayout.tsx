@@ -506,15 +506,45 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
     } catch {}
   };
 
-  const handleExportClip = (id?: number) => {
+  const handleExportClip = async (id?: number) => {
     const targetId = id || selectedCallId;
     if (!targetId) return;
-    const a = document.createElement('a');
-    a.href = `/api/recordings/${targetId}/audio`;
-    a.download = `transmission_${targetId}.wav`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    const authToken = token || localStorage.getItem('sdr_auth_token') || sessionStorage.getItem('sdr_auth_token') || '';
+
+    // Find call record to build a clean filename with frequency, time, and true extension
+    const call = calls.find((c) => c.id === targetId);
+    let filename = `transmission_${targetId}.opus`;
+    if (call) {
+      const freq = ((call.frequency_hz || call.frequencyHz || 0) / 1e6).toFixed(3);
+      const rawTime = (call.start_time || call.startTime || '').replace(/[-:]/g, '').replace('T', '_');
+      const timeClean = rawTime.split('.')[0] || `${targetId}`;
+      const ext = call.file_path?.endsWith('.wav') ? 'wav' : 'opus';
+      filename = `ch_${freq}MHz_${timeClean}.${ext}`;
+    }
+
+    try {
+      const res = await fetch(`/api/recordings/${targetId}/audio?download=true`, {
+        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+      });
+      if (!res.ok) throw new Error('Download request failed');
+      const blob = await res.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 2000);
+    } catch {
+      // Fallback with authenticated token query param
+      const a = document.createElement('a');
+      a.href = `/api/recordings/${targetId}/audio?download=true${authToken ? `&token=${encodeURIComponent(authToken)}` : ''}`;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
   };
 
   // Unified Live & Playback Volume Control Handler
@@ -655,9 +685,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
         </div>
 
         {/* Center Column: Live Monitor, Spectrum, Timeline Scrubber & Playback Controls */}
-        <main className="flex-1 min-w-0 min-h-0 flex flex-col overflow-y-auto p-4 md:p-6 gap-4 bg-obsidian h-full">
+        <main className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden p-3 md:p-4 gap-3 bg-obsidian h-full">
           {/* Live Audio Monitor & Telemetry Bar */}
-          <div className="bg-ash/80 backdrop-blur border border-charcoal rounded-cards px-4 py-3 flex items-center justify-between gap-3 select-none">
+          <div className="bg-ash/80 backdrop-blur border border-charcoal rounded-cards px-4 py-2.5 flex items-center justify-between gap-3 select-none shrink-0">
             {/* Live Reception Status */}
             <div className="flex items-center gap-3 font-mono text-xs">
               <div
@@ -689,17 +719,19 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
           </div>
 
           {/* Live SDR Spectrum Visualizer (Spectrum only, positioned directly above 24h timeline) */}
-          <LiveSpectrumVisualizer
-            frequencyHz={frequencyHz}
-            modulation={modulation}
-            squelchOpen={squelchOpen}
-            rssi={liveRssi}
-            hardwareConnected={hardwareConnected}
-            analyserNode={audioPlayerRef.current?.getAnalyser() ?? null}
-          />
+          <div className="shrink-0">
+            <LiveSpectrumVisualizer
+              frequencyHz={frequencyHz}
+              modulation={modulation}
+              squelchOpen={squelchOpen}
+              rssi={liveRssi}
+              hardwareConnected={hardwareConnected}
+              analyserNode={audioPlayerRef.current?.getAnalyser() ?? null}
+            />
+          </div>
 
           {/* 24-Hour Canvas Timeline Scrubber */}
-          <div className="flex-1 flex flex-col min-h-[280px]">
+          <div className="flex-1 min-h-[160px] flex flex-col overflow-hidden">
             <TimelineScrubber
               date={selectedDate}
               transmissions={timelineTransmissions}
@@ -711,21 +743,23 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
           </div>
 
           {/* Playback Controls Transport Bar */}
-          <PlaybackControls
-            isPlaying={isPlaying}
-            onPlayPause={handlePlayPause}
-            onPrevCall={handlePrevCall}
-            onNextCall={handleNextCall}
-            playbackRate={playbackRate}
-            onPlaybackRateChange={setPlaybackRate}
-            dspFilterActive={dspFilterActive}
-            onToggleDspFilter={() => setDspFilterActive(!dspFilterActive)}
-            volume={volume}
-            onVolumeChange={handleVolumeChange}
-            onExportClip={handleExportClip}
-            hasActiveCall={Boolean(selectedCallId)}
-            activeCallTitle={activeCallTitle}
-          />
+          <div className="shrink-0">
+            <PlaybackControls
+              isPlaying={isPlaying}
+              onPlayPause={handlePlayPause}
+              onPrevCall={handlePrevCall}
+              onNextCall={handleNextCall}
+              playbackRate={playbackRate}
+              onPlaybackRateChange={setPlaybackRate}
+              dspFilterActive={dspFilterActive}
+              onToggleDspFilter={() => setDspFilterActive(!dspFilterActive)}
+              volume={volume}
+              onVolumeChange={handleVolumeChange}
+              onExportClip={handleExportClip}
+              hasActiveCall={Boolean(selectedCallId)}
+              activeCallTitle={activeCallTitle}
+            />
+          </div>
         </main>
 
         {/* Right Column: Call Log History Panel with HistoryDatePicker */}

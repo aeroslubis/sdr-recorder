@@ -68,16 +68,16 @@ export const PlaybackControls: React.FC<PlaybackControlsProps> = ({
           onClick={onPlayPause}
           aria-label={isPlaying ? 'Pause' : 'Play'}
           title={isPlaying ? 'Pause' : 'Play'}
-          className="px-4 py-2 rounded-pill bg-phosphor-green text-obsidian hover:bg-mint-pulse font-medium transition-all cursor-pointer flex items-center gap-1.5 text-xs shadow-sm"
+          className="w-[84px] justify-center px-3 py-2 rounded-pill bg-phosphor-green text-obsidian hover:bg-mint-pulse font-medium transition-colors cursor-pointer flex items-center gap-1.5 text-xs shadow-sm flex-shrink-0"
         >
           {isPlaying ? (
             <>
-              <Pause className="w-4 h-4 fill-obsidian" />
+              <Pause className="w-4 h-4 fill-obsidian shrink-0" />
               <span>Pause</span>
             </>
           ) : (
             <>
-              <Play className="w-4 h-4 fill-obsidian ml-0.5" />
+              <Play className="w-4 h-4 fill-obsidian shrink-0" />
               <span>Play</span>
             </>
           )}
