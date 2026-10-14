@@ -161,3 +161,17 @@ async def test_sdr_receiver_stops_recording_when_hardware_disconnected():
         for _chunk, result in chunks_received:
             assert result.is_open is False
             assert result.rssi_dbfs == -100.0
+
+
+@pytest.mark.asyncio
+async def test_receiver_update_config_handles_frequency_change():
+    """Verify that update_config updates frequency without throwing AttributeError."""
+    config = DongleConfig(frequency_hz=118200000, modulation="AM")
+    receiver = SDRReceiver(config=config)
+
+    # Calling update_config with new frequency should cleanly update without error
+    new_cfg = DongleConfig(frequency_hz=145500000, modulation="NFM")
+    await receiver.update_config(new_cfg)
+    assert receiver.config.frequency_hz == 145500000
+    assert receiver.config.modulation == "NFM"
+

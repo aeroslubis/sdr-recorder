@@ -456,6 +456,7 @@ class SDRReceiver:
     async def restart(self) -> None:
         """Restarts the receiver engine."""
         await self.stop()
+        await asyncio.sleep(0.15)
         await self.start()
 
     async def update_config(self, new_config: DongleConfig) -> None:
@@ -479,7 +480,7 @@ class SDRReceiver:
         self.squelch_evaluator.hang_time_ms = new_config.hang_time_ms
         self.squelch_evaluator.pre_roll_ms = new_config.pre_roll_ms
 
-        if rf_changed and self._running and not self._is_simulator:
+        if rf_changed and self._running and not self.is_simulator:
             await self.restart()
 
     async def __aenter__(self) -> "SDRReceiver":
