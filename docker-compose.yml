@@ -1,0 +1,37 @@
+services:
+  sdr-recorder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: sdr-recorder:latest
+    container_name: sdr-recorder
+    restart: unless-stopped
+    ports:
+      - "${SDR_PORT:-8000}:8000"
+    environment:
+      - TZ=${TZ:-Asia/Jayapura}
+      - JWT_SECRET=${JWT_SECRET:-sdr-recorder-secret-key-change-in-production}
+      - DEFAULT_ADMIN_USERNAME=${DEFAULT_ADMIN_USERNAME:-admin}
+      - DEFAULT_ADMIN_PASSWORD=${DEFAULT_ADMIN_PASSWORD:-12345}
+      - DEFAULT_FREQUENCY_HZ=${DEFAULT_FREQUENCY_HZ:-118200000}
+      - DEFAULT_MODULATION=${DEFAULT_MODULATION:-AM}
+      - DEFAULT_SQUELCH_THRESHOLD=${DEFAULT_SQUELCH_THRESHOLD:--42.0}
+      - DEFAULT_AUDIO_FORMAT=${DEFAULT_AUDIO_FORMAT:-opus}
+      - DEFAULT_RETENTION_DAYS=${DEFAULT_RETENTION_DAYS:-14}
+      - DEFAULT_MAX_DISK_USAGE_PERCENT=${DEFAULT_MAX_DISK_USAGE_PERCENT:-90}
+    volumes:
+      # Persistent storage for SQLite database & audio recordings on host VPS
+      - ./storage:/app/storage
+      # Sync server timezone with host VPS
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+    # RTL-SDR USB Dongle hardware pass-through
+    # If running purely in Mock Simulator mode without USB dongle, these can remain active
+    privileged: true
+    devices:
+      - /dev/bus/usb:/dev/bus/usb
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"

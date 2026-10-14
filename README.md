@@ -139,6 +139,53 @@ sudo apt-get install -y rtl-sdr ffmpeg python3-venv nodex
 
 ---
 
+## Deploy to VPS with Docker & Docker Compose
+
+Deploying to a Linux VPS (Ubuntu / Debian / CentOS / Alpine) takes only 2 commands:
+
+### 1. Prerequisites on VPS
+Ensure Docker and Docker Compose are installed:
+```bash
+sudo apt-get update && sudo apt-get install -y docker.io docker-compose-v2
+```
+
+*(Optional - if physical RTL-SDR dongle is plugged into VPS)*: Prevent the Linux kernel DVB-T driver from claiming the dongle:
+```bash
+echo 'blacklist dvb_usb_rtl28xxu' | sudo tee /etc/modprobe.d/blacklist-rtlsdr.conf
+sudo rmmod dvb_usb_rtl28xxu 2>/dev/null || true
+```
+
+### 2. Configure & Start
+```bash
+# Clone the repository
+git clone https://github.com/your-org/sdr-recorder.git
+cd sdr-recorder
+
+# (Optional) Customize environment variables
+cp .env.example .env
+nano .env
+
+# Build and start container in detached mode
+docker compose up -d --build
+```
+
+### 3. Verification & Monitoring
+```bash
+# Check container status
+docker compose ps
+
+# View live container logs
+docker compose logs -f
+
+# Check health endpoint
+curl http://localhost:8000/api/health
+```
+
+The application will be accessible at `http://<your-vps-ip>:8000` with default credentials `admin` / `12345`.
+All database data and audio recordings are persisted in `./storage` on the VPS host.
+
+---
+
 ## Hardware SDR Configuration (BrowSDR Reference)
 
 SDR-Recorder includes extensive hardware controls inspired by BrowSDR, accessible via **`admin ▾` -> SDR Dongle Configuration**:
