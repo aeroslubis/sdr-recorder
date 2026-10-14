@@ -76,6 +76,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
   const audioPlayerRef = useRef<WebAudioPlayer | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
+  const selectedIntervalRef = useRef<TransmissionInterval | null>(null);
+
   // Initialize WebAudioPlayer
   useEffect(() => {
     const player = new WebAudioPlayer();
@@ -83,6 +85,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
 
     player.onStateChange = (playing) => {
       setIsPlaying(playing);
+    };
+
+    player.onTimeUpdate = (currentTimeSec) => {
+      if (selectedIntervalRef.current) {
+        setCurrentTimeMs(selectedIntervalRef.current.start_ms + currentTimeSec * 1000);
+      }
     };
 
     player.onEnded = () => {
@@ -305,8 +313,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
   // Presets Handlers
   const handleCreatePreset = async (preset: Omit<PresetItem, 'id'> | PresetItem) => {
     try {
-      const res = await authFetch('/api/radio/presets', {
-        method: 'POST',
+      const isUpdate = 'id' in preset && preset.id !== undefined && preset.id !== null;
+      const url = isUpdate ? `/api/radio/presets/${preset.id}` : '/api/radio/presets';
+      const method = isUpdate ? 'PUT' : 'POST';
+
+      const res = await authFetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(preset),
       });
@@ -348,6 +360,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
       setActiveCallTitle(`${freq} MHz · ${time}`);
     }
     const matchedInterval = timelineTransmissions.find((t) => t.id === id);
+    selectedIntervalRef.current = matchedInterval || null;
     if (matchedInterval) {
       setCurrentTimeMs(matchedInterval.start_ms);
     }
@@ -355,7 +368,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
 
   const handlePlayCall = async (id: number) => {
     handleSelectTransmission(id);
-    const audioUrl = `/api/recordings/${id}/audio`;
+    const authToken = token || localStorage.getItem('sdr_auth_token') || sessionStorage.getItem('sdr_auth_token') || '';
+    const audioUrl = `/api/recordings/${id}/audio${authToken ? `?token=${encodeURIComponent(authToken)}` : ''}`;
     if (audioPlayerRef.current) {
       try {
         await audioPlayerRef.current.playUrl(audioUrl);
@@ -369,7 +383,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
       audioPlayerRef.current.pause();
     } else {
       if (selectedCallId) {
-        const audioUrl = `/api/recordings/${selectedCallId}/audio`;
+        const authToken = token || localStorage.getItem('sdr_auth_token') || sessionStorage.getItem('sdr_auth_token') || '';
+        const audioUrl = `/api/recordings/${selectedCallId}/audio${authToken ? `?token=${encodeURIComponent(authToken)}` : ''}`;
         try {
           await audioPlayerRef.current.playUrl(audioUrl);
         } catch {}

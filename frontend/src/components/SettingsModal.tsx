@@ -9,6 +9,7 @@ import {
   AlertCircle,
   Plus,
   Trash2,
+  Edit2,
   Save,
 } from 'lucide-react';
 import { PresetItem } from './RadioTuningPanel';
@@ -156,6 +157,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     category: 'Airband',
     squelch_threshold: -42.0,
   });
+  const [editingPreset, setEditingPreset] = useState<PresetItem | null>(null);
+  const [editPresetError, setEditPresetError] = useState<string | null>(null);
+  const [editPresetForm, setEditPresetForm] = useState({
+    name: '',
+    frequencyMHz: '118.200',
+    modulation: 'AM',
+    category: 'Airband',
+    squelch_threshold: -42.0,
+  });
 
   // Tab 3: Storage Settings State
   const [storageSettings, setStorageSettings] = useState<StorageSettings>({
@@ -276,6 +286,46 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     });
     setPresetError(null);
     setShowAddPreset(false);
+  };
+
+  const handleStartEditPreset = (p: PresetItem) => {
+    setEditingPreset(p);
+    setEditPresetForm({
+      name: p.name,
+      frequencyMHz: (p.frequency_hz / 1e6).toFixed(3),
+      modulation: p.modulation,
+      category: p.category || 'General',
+      squelch_threshold: p.squelch_threshold ?? -42.0,
+    });
+    setEditPresetError(null);
+  };
+
+  const handleEditChannelSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPreset || !editPresetForm.name.trim()) return;
+
+    const freqVal = parseFloat(editPresetForm.frequencyMHz);
+    const err = validateFrequency(freqVal, editPresetForm.category);
+    if (err) {
+      setEditPresetError(err);
+      return;
+    }
+    setEditPresetError(null);
+
+    const freqHz = Math.round(freqVal * 1e6);
+
+    if (onSavePreset) {
+      onSavePreset({
+        id: editingPreset.id,
+        name: editPresetForm.name.trim(),
+        frequency_hz: freqHz,
+        modulation: editPresetForm.modulation,
+        category: editPresetForm.category,
+        squelch_threshold: editPresetForm.squelch_threshold,
+      });
+    }
+
+    setEditingPreset(null);
   };
 
   const diskPercent = Math.min(100, Math.round((diskUsedGB / (diskTotalGB || 1)) * 100));
@@ -745,6 +795,127 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </form>
               )}
 
+              {/* Edit Channel Form */}
+              {editingPreset && (
+                <form onSubmit={handleEditChannelSubmit} className="bg-ash border border-phosphor-green/40 rounded-cards p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs font-semibold text-snow flex items-center gap-1.5">
+                      <Edit2 className="w-3.5 h-3.5 text-phosphor-green" />
+                      <span>Edit Channel Preset: {editingPreset.name}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setEditingPreset(null)}
+                      className="text-smoke hover:text-snow p-0.5"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {editPresetError && (
+                    <div
+                      className="flex items-center gap-2 p-2.5 rounded-inputs bg-red-950/40 border border-red-500/50 text-red-400 text-xs font-mono"
+                      role="alert"
+                    >
+                      <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-400" />
+                      <span>{editPresetError}</span>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] text-silver-mist mb-1">Channel Name</label>
+                      <input
+                        type="text"
+                        required
+                        value={editPresetForm.name}
+                        onChange={(e) => setEditPresetForm({ ...editPresetForm, name: e.target.value })}
+                        className="w-full bg-obsidian border border-slate focus:border-phosphor-green rounded-inputs px-2.5 py-1.5 text-xs text-snow outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] text-silver-mist mb-1">Frequency (MHz)</label>
+                      <input
+                        type="number"
+                        step="0.001"
+                        required
+                        value={editPresetForm.frequencyMHz}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setEditPresetForm({ ...editPresetForm, frequencyMHz: val });
+                          const err = validateFrequency(parseFloat(val), editPresetForm.category);
+                          setEditPresetError(err);
+                        }}
+                        className={`w-full bg-obsidian border ${
+                          editPresetError ? 'border-red-500' : 'border-slate focus:border-phosphor-green'
+                        } rounded-inputs px-2.5 py-1.5 text-xs text-snow font-mono outline-none`}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[11px] text-silver-mist mb-1">Modulation</label>
+                      <select
+                        value={editPresetForm.modulation}
+                        onChange={(e) => setEditPresetForm({ ...editPresetForm, modulation: e.target.value })}
+                        className="w-full bg-obsidian border border-slate rounded-inputs px-2.5 py-1.5 text-xs text-snow outline-none"
+                      >
+                        <option value="AM">AM</option>
+                        <option value="NFM">NFM</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] text-silver-mist mb-1">Category</label>
+                      <select
+                        value={editPresetForm.category}
+                        onChange={(e) => {
+                          const cat = e.target.value;
+                          setEditPresetForm({ ...editPresetForm, category: cat });
+                          const err = validateFrequency(parseFloat(editPresetForm.frequencyMHz), cat);
+                          setEditPresetError(err);
+                        }}
+                        className="w-full bg-obsidian border border-slate rounded-inputs px-2.5 py-1.5 text-xs text-snow outline-none"
+                      >
+                        <option value="Airband">Airband</option>
+                        <option value="Marine">Marine</option>
+                        <option value="Ham">Ham</option>
+                        <option value="General">General</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] text-silver-mist mb-1">Squelch Threshold</label>
+                      <input
+                        type="number"
+                        step="1"
+                        value={editPresetForm.squelch_threshold}
+                        onChange={(e) =>
+                          setEditPresetForm({
+                            ...editPresetForm,
+                            squelch_threshold: parseFloat(e.target.value) || -42,
+                          })
+                        }
+                        className="w-full bg-obsidian border border-slate rounded-inputs px-2.5 py-1.5 text-xs text-snow font-mono outline-none"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setEditingPreset(null)}
+                      className="px-3 py-1.5 text-xs text-smoke hover:text-snow cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-3.5 py-1.5 text-xs bg-phosphor-green text-obsidian font-medium rounded-pill hover:bg-mint-pulse transition-colors cursor-pointer"
+                    >
+                      Update Channel
+                    </button>
+                  </div>
+                </form>
+              )}
+
               {/* Presets Table */}
               <div className="border border-charcoal rounded-inputs overflow-hidden">
                 <table className="w-full text-left text-xs">
@@ -778,12 +949,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             </span>
                           </td>
                           <td className="py-2.5 px-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleStartEditPreset(p)}
+                              className="text-smoke hover:text-phosphor-green p-1 transition-colors cursor-pointer mr-1"
+                              title="Edit Channel"
+                              aria-label={`Edit ${p.name}`}
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
                             {onDeletePreset && p.id && (
                               <button
                                 type="button"
                                 onClick={() => onDeletePreset(p.id!)}
-                                className="text-smoke hover:text-red-400 p-1 transition-colors"
+                                className="text-smoke hover:text-red-400 p-1 transition-colors cursor-pointer"
                                 title="Delete Channel"
+                                aria-label={`Delete ${p.name}`}
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>

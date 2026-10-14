@@ -176,6 +176,64 @@ def create_preset(payload: PresetCreate, db: sqlite3.Connection = Depends(get_db
     return dict(row)
 
 
+@router.put("/presets/{preset_id}", response_model=PresetModel)
+def update_preset(
+    preset_id: int,
+    payload: PresetCreate,
+    db: sqlite3.Connection = Depends(get_db),
+) -> Dict[str, Any]:
+    """Update an existing channel preset with Ham/Airband range validation."""
+    freq_mhz = payload.frequency_hz / 1e6
+    if freq_mhz > 450.0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Frequency exceeds allowed Ham/Airband range (Max 450.000 MHz)",
+        )
+    if payload.category == "Airband":
+        if freq_mhz < 108.0 or freq_mhz > 137.0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Airband frequency must be between 108.000 MHz and 137.000 MHz",
+            )
+    elif payload.category == "Ham":
+        is_2m = 144.0 <= freq_mhz <= 148.0
+        is_70cm = 420.0 <= freq_mhz <= 450.0
+        if not (is_2m or is_70cm):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Ham frequency must be within 2m (144-148 MHz) or 70cm (420-450 MHz) range",
+            )
+
+    cursor = db.cursor()
+    cursor.execute("SELECT id FROM presets WHERE id = ?", (preset_id,))
+    if not cursor.fetchone():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Preset not found")
+
+    cursor.execute(
+        """
+        UPDATE presets
+        SET name = ?, frequency_hz = ?, modulation = ?, squelch_threshold = ?, category = ?
+        WHERE id = ?
+        """,
+        (
+            payload.name,
+            payload.frequency_hz,
+            payload.modulation,
+            payload.squelch_threshold,
+            payload.category,
+            preset_id,
+        ),
+    )
+    db.commit()
+
+    cursor.execute(
+        "SELECT id, name, frequency_hz, modulation, squelch_threshold, category, created_at FROM presets WHERE id = ?",
+        (preset_id,),
+    )
+    row = cursor.fetchone()
+    return dict(row)
+
+
 @router.delete("/presets/{preset_id}")
 def delete_preset(preset_id: int, db: sqlite3.Connection = Depends(get_db)) -> Dict[str, str]:
     """Delete a saved channel preset by ID."""

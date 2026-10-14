@@ -158,7 +158,7 @@ export const RadioTuningPanel: React.FC<RadioTuningPanelProps> = ({
             {formatFrequencyHz(frequencyHz)}
           </div>
           <div className="text-[11px] text-smoke font-mono mt-1">
-            {(frequencyHz / 1e6).toFixed(4)} MHz · {modulation}
+            {modulation}
           </div>
         </div>
 

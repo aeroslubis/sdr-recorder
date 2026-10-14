@@ -178,7 +178,7 @@ def get_recording_audio(
     if suffix == ".wav":
         content_type = "audio/wav"
     elif suffix in [".opus", ".ogg"]:
-        content_type = "audio/opus"
+        content_type = "audio/ogg; codecs=opus"
     elif suffix == ".mp3":
         content_type = "audio/mpeg"
     else:

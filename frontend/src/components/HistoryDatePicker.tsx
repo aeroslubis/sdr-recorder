@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Calendar, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export interface HistoryDatePickerProps {
   selectedDate: string; // YYYY-MM-DD
@@ -97,21 +97,8 @@ export const HistoryDatePicker: React.FC<HistoryDatePickerProps> = ({
 
   const activeDatesSet = new Set(externalActiveDates ?? internalActiveDates);
 
-  // Quick navigation helpers
-  const handleShiftDay = (deltaDays: number) => {
-    const cur = parseDate(selectedDate);
-    cur.setDate(cur.getDate() + deltaDays);
-    onSelectDate(formatDate(cur));
-  };
-
   const handleGoToday = () => {
     onSelectDate(formatDate(new Date()));
-  };
-
-  const handleLast7Days = () => {
-    const cur = new Date();
-    cur.setDate(cur.getDate() - 7);
-    onSelectDate(formatDate(cur));
   };
 
   // Calendar rendering calculations
@@ -146,24 +133,13 @@ export const HistoryDatePicker: React.FC<HistoryDatePickerProps> = ({
   return (
     <div className={`relative flex flex-col gap-2 ${className}`} ref={popoverRef}>
       {/* Date Navigation & Shortcuts Bar */}
-      <div className="flex items-center justify-between gap-1.5 p-1 bg-ash border border-charcoal rounded-cards text-xs font-mono">
-        <button
-          type="button"
-          onClick={() => handleShiftDay(-1)}
-          aria-label="Yesterday"
-          title="Go to Yesterday"
-          className="flex items-center gap-1 px-2.5 py-1.5 rounded-pill bg-obsidian border border-charcoal hover:border-slate text-silver-mist hover:text-snow transition-colors cursor-pointer"
-        >
-          <ChevronLeft className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Yesterday</span>
-        </button>
-
+      <div className="flex items-center justify-between gap-2 p-1 bg-ash border border-charcoal rounded-cards text-xs font-mono">
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
           aria-label="Calendar"
           title="Open Calendar Date Picker"
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-pill border transition-colors cursor-pointer ${
+          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-pill border transition-colors cursor-pointer ${
             isOpen
               ? 'bg-phosphor-green/10 border-phosphor-green text-phosphor-green'
               : 'bg-obsidian border-charcoal hover:border-slate text-snow'
@@ -179,44 +155,18 @@ export const HistoryDatePicker: React.FC<HistoryDatePickerProps> = ({
           )}
         </button>
 
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={handleGoToday}
-            aria-label="Today"
-            title="Jump to Today"
-            className={`px-2.5 py-1.5 rounded-pill border text-xs font-mono transition-colors cursor-pointer ${
-              selectedDate === todayStr
-                ? 'bg-phosphor-green/20 border-phosphor-green text-phosphor-green font-medium'
-                : 'bg-obsidian border-charcoal hover:border-slate text-silver-mist hover:text-snow'
-            }`}
-          >
-            Today
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleShiftDay(1)}
-            aria-label="Tomorrow"
-            title="Go to Tomorrow"
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-pill bg-obsidian border border-charcoal hover:border-slate text-silver-mist hover:text-snow transition-colors cursor-pointer"
-          >
-            <span className="hidden sm:inline">Tomorrow</span>
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </div>
-
-      {/* Quick shortcut tags */}
-      <div className="flex items-center gap-2 px-1 text-[11px] font-mono text-smoke">
         <button
           type="button"
-          onClick={handleLast7Days}
-          aria-label="Last 7 Days"
-          className="hover:text-phosphor-green transition-colors cursor-pointer flex items-center gap-1"
+          onClick={handleGoToday}
+          aria-label="Today"
+          title="Jump to Today"
+          className={`px-3 py-1.5 rounded-pill border text-xs font-mono transition-colors cursor-pointer ${
+            selectedDate === todayStr
+              ? 'bg-phosphor-green/20 border-phosphor-green text-phosphor-green font-medium'
+              : 'bg-obsidian border-charcoal hover:border-slate text-silver-mist hover:text-snow'
+          }`}
         >
-          <Clock className="w-3 h-3 text-smoke" />
-          <span>Last 7 Days</span>
+          Today
         </button>
       </div>
 
@@ -272,27 +222,32 @@ export const HistoryDatePicker: React.FC<HistoryDatePickerProps> = ({
               ).padStart(2, '0')}`;
               const isSelected = dateStr === selectedDate;
               const isToday = dateStr === todayStr;
+              const isFuture = dateStr > todayStr;
               const hasRecordings = activeDatesSet.has(dateStr);
 
               return (
                 <button
                   key={dateStr}
                   type="button"
+                  disabled={isFuture}
                   onClick={() => {
+                    if (isFuture) return;
                     onSelectDate(dateStr);
                     setIsOpen(false);
                   }}
-                  className={`h-8 rounded-inputs relative flex flex-col items-center justify-center text-xs font-mono transition-colors cursor-pointer ${
-                    isSelected
-                      ? 'bg-forest-depth border border-phosphor-green text-snow font-bold'
+                  className={`h-8 rounded-inputs relative flex flex-col items-center justify-center text-xs font-mono transition-colors ${
+                    isFuture
+                      ? 'opacity-25 text-smoke/50 cursor-not-allowed pointer-events-none'
+                      : isSelected
+                      ? 'bg-forest-depth border border-phosphor-green text-snow font-bold cursor-pointer'
                       : isToday
-                      ? 'bg-obsidian border border-slate text-phosphor-green font-semibold hover:border-phosphor-green'
-                      : 'hover:bg-obsidian text-silver-mist hover:text-snow'
+                      ? 'bg-obsidian border border-slate text-phosphor-green font-semibold hover:border-phosphor-green cursor-pointer'
+                      : 'hover:bg-obsidian text-silver-mist hover:text-snow cursor-pointer'
                   }`}
                 >
                   <span>{day}</span>
                   {/* Distinct Phosphor Green Dot for days with recordings */}
-                  {hasRecordings && (
+                  {hasRecordings && !isFuture && (
                     <span
                       aria-label="has-recording"
                       className="absolute bottom-1 w-1.5 h-1.5 rounded-full bg-phosphor-green shadow-[0_0_4px_#3ecf8e]"

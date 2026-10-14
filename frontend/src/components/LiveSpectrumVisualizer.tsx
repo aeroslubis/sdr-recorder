@@ -23,6 +23,22 @@ export const LiveSpectrumVisualizer: React.FC<LiveSpectrumVisualizerProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animFrameRef = useRef<number | null>(null);
   const peakHoldRef = useRef<number[]>([]);
+  const stateRef = useRef({
+    squelchOpen,
+    rssi,
+    hardwareConnected,
+    analyserNode,
+  });
+
+  // Keep stateRef fresh without tearing down animation loop
+  useEffect(() => {
+    stateRef.current = {
+      squelchOpen,
+      rssi,
+      hardwareConnected,
+      analyserNode,
+    };
+  });
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -30,10 +46,16 @@ export const LiveSpectrumVisualizer: React.FC<LiveSpectrumVisualizerProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    let bufferLength = analyserNode ? analyserNode.frequencyBinCount : 64;
-    let dataArray = new Uint8Array(bufferLength);
+    let dataArray = new Uint8Array(128);
 
     const render = () => {
+      const {
+        squelchOpen: curSquelchOpen,
+        rssi: curRssi,
+        hardwareConnected: curHwConnected,
+        analyserNode: curAnalyser,
+      } = stateRef.current;
+
       const width = canvas.width;
       const height = canvas.height;
 
@@ -53,15 +75,18 @@ export const LiveSpectrumVisualizer: React.FC<LiveSpectrumVisualizerProps> = ({
       const numBars = 64;
       const displayData: number[] = new Array(numBars);
 
-      if (!hardwareConnected) {
+      if (!curHwConnected) {
         // Disconnected: Flat red line / stationary minimal bars, no movement
         for (let i = 0; i < numBars; i++) {
           displayData[i] = 0.04; // Flat static line at the bottom
         }
       } else {
         let hasRealAudio = false;
-        if (analyserNode) {
-          analyserNode.getByteFrequencyData(dataArray);
+        if (curAnalyser) {
+          if (dataArray.length !== curAnalyser.frequencyBinCount) {
+            dataArray = new Uint8Array(curAnalyser.frequencyBinCount);
+          }
+          curAnalyser.getByteFrequencyData(dataArray);
           // Check if any bin has significant energy
           for (let i = 0; i < dataArray.length; i++) {
             if (dataArray[i] > 10) {
@@ -79,12 +104,12 @@ export const LiveSpectrumVisualizer: React.FC<LiveSpectrumVisualizerProps> = ({
           }
         } else {
           // Base noise floor based on RSSI (-100 dBFS = ~0.08, -50 dBFS = ~0.25)
-          const baseLevel = Math.max(0.04, Math.min(0.85, ((rssi + 100) / 100) * 0.35));
+          const baseLevel = Math.max(0.04, Math.min(0.85, ((curRssi + 100) / 100) * 0.35));
           const time = Date.now() / 150;
 
           for (let i = 0; i < numBars; i++) {
             let val = baseLevel + Math.sin(i * 0.3 + time) * 0.03 + (Math.random() - 0.5) * 0.04;
-            if (squelchOpen) {
+            if (curSquelchOpen) {
               // Voice resonance formant peaks around the center
               const centerDist = Math.abs(i - numBars / 2) / (numBars / 2);
               const voiceBump =
@@ -112,7 +137,7 @@ export const LiveSpectrumVisualizer: React.FC<LiveSpectrumVisualizerProps> = ({
         const y = height - barHeight;
 
         // Peak decay
-        if (!hardwareConnected) {
+        if (!curHwConnected) {
           peakHoldRef.current[i] = displayData[i];
         } else {
           if (displayData[i] >= peakHoldRef.current[i]) {
@@ -123,7 +148,7 @@ export const LiveSpectrumVisualizer: React.FC<LiveSpectrumVisualizerProps> = ({
         }
 
         // Color bars: Red when disconnected, Phosphor green when connected
-        if (!hardwareConnected) {
+        if (!curHwConnected) {
           if (typeof ctx.createLinearGradient === 'function') {
             const gradient = ctx.createLinearGradient(0, y, 0, height);
             gradient.addColorStop(0, '#ef4444');
@@ -148,7 +173,7 @@ export const LiveSpectrumVisualizer: React.FC<LiveSpectrumVisualizerProps> = ({
 
         // Peak hold marker
         const peakY = height - peakHoldRef.current[i] * height;
-        ctx.fillStyle = !hardwareConnected ? '#ef4444' : '#00c573';
+        ctx.fillStyle = !curHwConnected ? '#ef4444' : '#00c573';
         ctx.fillRect(x, peakY - 1, barWidth, 1.5);
       }
 
@@ -162,7 +187,7 @@ export const LiveSpectrumVisualizer: React.FC<LiveSpectrumVisualizerProps> = ({
         cancelAnimationFrame(animFrameRef.current);
       }
     };
-  }, [analyserNode, squelchOpen, rssi, hardwareConnected]);
+  }, []);
 
   return (
     <div className={`bg-ash/70 border border-charcoal rounded-cards p-3 flex flex-col gap-2 select-none ${className}`}>
@@ -198,13 +223,13 @@ export const LiveSpectrumVisualizer: React.FC<LiveSpectrumVisualizerProps> = ({
         </div>
       </div>
 
-      {/* Spectrum Canvas */}
-      <div className="w-full h-20 bg-obsidian rounded-inputs overflow-hidden border border-charcoal/60 relative">
+      {/* Spectrum Canvas: Taller height (h-36 / 144px) */}
+      <div className="w-full h-36 bg-obsidian rounded-inputs overflow-hidden border border-charcoal/60 relative">
         <canvas
           ref={canvasRef}
           data-testid="sdr-spectrum-canvas"
-          width={700}
-          height={80}
+          width={800}
+          height={144}
           className="w-full h-full block"
         />
       </div>

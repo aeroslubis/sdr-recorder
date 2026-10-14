@@ -138,4 +138,39 @@ describe('SettingsModal', () => {
       squelch_threshold: -42.0,
     });
   });
+
+  test('allows editing an existing channel preset in Channel Setup tab', () => {
+    const handleSavePreset = jest.fn();
+    render(
+      <SettingsModal
+        isOpen={true}
+        initialTab="channels"
+        onClose={jest.fn()}
+        onSaveDongle={jest.fn()}
+        onSaveStorage={jest.fn()}
+        onChangePassword={jest.fn()}
+        presets={[
+          { id: 1, name: 'Haneda Tower', frequency_hz: 118200000, modulation: 'AM', category: 'Airband' },
+        ]}
+        onSavePreset={handleSavePreset}
+      />
+    );
+
+    // Edit button exists
+    const editBtn = screen.getByRole('button', { name: /Edit Haneda Tower/i });
+    expect(editBtn).toBeInTheDocument();
+    fireEvent.click(editBtn);
+
+    // Edit form appears
+    expect(screen.getByText(/Edit Channel Preset: Haneda Tower/i)).toBeInTheDocument();
+    const updateBtn = screen.getByRole('button', { name: /Update Channel/i });
+    expect(updateBtn).toBeInTheDocument();
+
+    fireEvent.click(updateBtn);
+    expect(handleSavePreset).toHaveBeenCalledWith(expect.objectContaining({
+      id: 1,
+      name: 'Haneda Tower',
+      frequency_hz: 118200000,
+    }));
+  });
 });

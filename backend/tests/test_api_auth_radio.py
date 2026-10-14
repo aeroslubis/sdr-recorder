@@ -195,6 +195,20 @@ def test_radio_presets_crud(client):
     assert len(presets) == initial_count + 1
     assert any(p["id"] == preset_id for p in presets)
 
+    # Update preset (PUT)
+    update_payload = {
+        "name": "Tower Channel Updated",
+        "frequency_hz": 119100000,
+        "modulation": "AM",
+        "squelch_threshold": -45.0,
+        "category": "Airband",
+    }
+    put_resp = client.put(f"/api/radio/presets/{preset_id}", json=update_payload, headers=headers)
+    assert put_resp.status_code == 200
+    updated = put_resp.json()
+    assert updated["name"] == "Tower Channel Updated"
+    assert updated["frequency_hz"] == 119100000
+
     # Delete preset
     del_resp = client.delete(f"/api/radio/presets/{preset_id}", headers=headers)
     assert del_resp.status_code == 200

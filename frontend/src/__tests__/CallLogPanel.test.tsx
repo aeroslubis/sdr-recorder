@@ -99,7 +99,7 @@ describe('CallLogPanel Component', () => {
     expect(screen.getByText(/no transmissions found/i)).toBeInTheDocument();
   });
 
-  test('interacts with HistoryDatePicker navigation', () => {
+  test('interacts with HistoryDatePicker navigation and verifies future dates are disabled', () => {
     const handleDateChange = jest.fn();
     render(
       <CallLogPanel
@@ -110,15 +110,14 @@ describe('CallLogPanel Component', () => {
       />
     );
 
-    // Click Yesterday
-    const yesterdayBtn = screen.getByRole('button', { name: /yesterday/i });
-    fireEvent.click(yesterdayBtn);
-    expect(handleDateChange).toHaveBeenCalledWith('2026-10-12');
+    // Verify Tomorrow and Yesterday buttons are removed
+    expect(screen.queryByRole('button', { name: /yesterday/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /tomorrow/i })).not.toBeInTheDocument();
 
-    // Click Tomorrow
-    const tomorrowBtn = screen.getByRole('button', { name: /tomorrow/i });
-    fireEvent.click(tomorrowBtn);
-    expect(handleDateChange).toHaveBeenCalledWith('2026-10-14');
+    // Click Today
+    const todayBtn = screen.getByRole('button', { name: /today/i });
+    fireEvent.click(todayBtn);
+    expect(handleDateChange).toHaveBeenCalled();
 
     // Open Calendar popover
     const calendarBtn = screen.getByRole('button', { name: /calendar/i });
