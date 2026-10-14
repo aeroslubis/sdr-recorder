@@ -5,6 +5,8 @@ export interface SMeterBarProps {
   squelchThreshold: number; // in dBFS, range -100 to 0
   squelchOpen: boolean;
   onSquelchChange?: (newThreshold: number) => void;
+  disabled?: boolean;
+  isAuto?: boolean;
   className?: string;
 }
 
@@ -18,6 +20,8 @@ export const SMeterBar: React.FC<SMeterBarProps> = ({
   squelchThreshold,
   squelchOpen,
   onSquelchChange,
+  disabled = false,
+  isAuto = false,
   className = '',
 }) => {
   const barRef = useRef<HTMLDivElement>(null);
@@ -32,7 +36,7 @@ export const SMeterBar: React.FC<SMeterBarProps> = ({
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
-      if (!onSquelchChange || !barRef.current) return;
+      if (disabled || !onSquelchChange || !barRef.current) return;
       (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
 
       const updateThresholdFromPointer = (clientX: number) => {
@@ -85,6 +89,11 @@ export const SMeterBar: React.FC<SMeterBarProps> = ({
           <span className={isBypass ? 'text-amber-400 font-semibold' : 'text-silver-mist'}>
             {isBypass ? 'BYPASS' : `${clampedThreshold.toFixed(1)} dBFS`}
           </span>
+          {isAuto && (
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-phosphor-green/20 text-phosphor-green border border-phosphor-green/40 font-medium">
+              AUTO
+            </span>
+          )}
         </div>
       </div>
 
@@ -92,10 +101,17 @@ export const SMeterBar: React.FC<SMeterBarProps> = ({
       <div
         ref={barRef}
         onPointerDown={handlePointerDown}
-        className="relative h-6 w-full bg-ash border border-charcoal rounded-inputs overflow-hidden cursor-crosshair group"
-        title={`Click or drag to set squelch threshold (currently ${clampedThreshold.toFixed(1)} dBFS)`}
+        className={`relative h-6 w-full bg-ash border border-charcoal rounded-inputs overflow-hidden ${
+          disabled ? 'cursor-not-allowed opacity-90' : 'cursor-crosshair group'
+        }`}
+        title={
+          disabled
+            ? `Squelch AUTO aktif (${clampedThreshold.toFixed(1)} dBFS terkunci). Matikan SQL AUTO untuk menggeser manual.`
+            : `Click or drag to set squelch threshold (currently ${clampedThreshold.toFixed(1)} dBFS)`
+        }
         role="slider"
         aria-label="Squelch threshold"
+        aria-disabled={disabled}
         aria-valuemin={-100}
         aria-valuemax={0}
         aria-valuenow={clampedThreshold}

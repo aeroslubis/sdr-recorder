@@ -23,6 +23,8 @@ export interface RadioTuningPanelProps {
   presets?: PresetItem[];
   dspFilterActive?: boolean;
   onToggleDspFilter?: () => void;
+  isAutoSquelch?: boolean;
+  onToggleAutoSquelch?: () => void;
   liveUnsquelched?: boolean;
   onToggleLiveMonitor?: () => void;
   onTune: (params: {
@@ -71,8 +73,8 @@ export const RadioTuningPanel: React.FC<RadioTuningPanelProps> = ({
   presets = DEFAULT_PRESETS,
   dspFilterActive = false,
   onToggleDspFilter,
-  liveUnsquelched = false,
-  onToggleLiveMonitor,
+  isAutoSquelch = false,
+  onToggleAutoSquelch,
   onTune,
   onUpdatePreset,
   onDeletePreset,
@@ -177,9 +179,11 @@ export const RadioTuningPanel: React.FC<RadioTuningPanelProps> = ({
             squelchThreshold={squelchThreshold}
             squelchOpen={squelchOpen}
             onSquelchChange={handleSquelchChange}
+            disabled={isAutoSquelch}
+            isAuto={isAutoSquelch}
           />
 
-          {/* Quick DSP Filter & Squelch Auto/Bypass buttons */}
+          {/* Quick DSP Filter & Squelch Auto/Manual buttons */}
           <div className="grid grid-cols-2 gap-2 mt-2.5">
             <button
               type="button"
@@ -198,17 +202,21 @@ export const RadioTuningPanel: React.FC<RadioTuningPanelProps> = ({
 
             <button
               type="button"
-              onClick={onToggleLiveMonitor}
-              aria-label="Live Squelch Bypass"
-              title={liveUnsquelched ? 'Restore Automatic Squelch' : 'Bypass Squelch to Listen Continuously'}
+              onClick={onToggleAutoSquelch}
+              aria-label="Auto Squelch Toggle"
+              title={
+                isAutoSquelch
+                  ? 'Auto Squelch aktif (slider terkunci). Klik untuk beralih ke Manual.'
+                  : 'Klik untuk mengaktifkan Auto Squelch (mencari titik squelch optimal).'
+              }
               className={`flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-inputs border text-[11px] font-mono transition-colors cursor-pointer ${
-                liveUnsquelched
-                  ? 'bg-amber-400/20 border-amber-400 text-amber-300 font-medium'
+                isAutoSquelch
+                  ? 'bg-phosphor-green/20 border-phosphor-green text-phosphor-green font-medium'
                   : 'bg-ash border-charcoal hover:border-slate text-silver-mist hover:text-snow'
               }`}
             >
               <Radio className="w-3.5 h-3.5" />
-              <span>{liveUnsquelched ? 'SQL BYPASS' : 'SQL AUTO'}</span>
+              <span>{isAutoSquelch ? 'SQL AUTO' : 'SQL MANUAL'}</span>
             </button>
           </div>
         </div>
@@ -306,13 +314,17 @@ export const RadioTuningPanel: React.FC<RadioTuningPanelProps> = ({
                   {/* Preset Info */}
                   <div
                     className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer"
-                    onClick={() =>
+                    onClick={() => {
+                      const targetSquelch =
+                        p.squelch_threshold !== undefined && p.squelch_threshold !== null
+                          ? p.squelch_threshold
+                          : squelchThreshold;
                       onTune({
                         frequencyHz: p.frequency_hz,
                         modulation: p.modulation,
-                        squelchThreshold: p.squelch_threshold ?? squelchThreshold,
-                      })
-                    }
+                        squelchThreshold: targetSquelch,
+                      });
+                    }}
                   >
                     <BookmarkCheck
                       className={`w-3.5 h-3.5 flex-shrink-0 ${
@@ -370,10 +382,14 @@ export const RadioTuningPanel: React.FC<RadioTuningPanelProps> = ({
                             onClick={(e) => {
                               e.stopPropagation();
                               setOpenMenuId(null);
+                              const targetSquelch =
+                                p.squelch_threshold !== undefined && p.squelch_threshold !== null
+                                  ? p.squelch_threshold
+                                  : squelchThreshold;
                               onTune({
                                 frequencyHz: p.frequency_hz,
                                 modulation: p.modulation,
-                                squelchThreshold: p.squelch_threshold ?? squelchThreshold,
+                                squelchThreshold: targetSquelch,
                               });
                             }}
                             className="w-full flex items-center gap-2 px-3 py-1.5 text-silver-mist hover:text-phosphor-green hover:bg-charcoal text-left transition-colors cursor-pointer"

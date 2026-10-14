@@ -49,6 +49,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
   const volumeRef = useRef<number>(0.8);
   const savedVolumeRef = useRef<number>(0.8);
   const savedAutoSquelchRef = useRef<number>(-42.0);
+  const [isAutoSquelch, setIsAutoSquelch] = useState<boolean>(false);
 
   // Archive & Timeline state
   const [timelineTransmissions, setTimelineTransmissions] = useState<TransmissionInterval[]>([]);
@@ -272,21 +273,30 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
     rfGain?: number;
     ppmOffset?: number;
   }) => {
-    try {
-      if (params.squelchThreshold !== undefined) {
-        if (params.squelchThreshold <= -98) {
-          setLiveUnsquelched(true);
-          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-            wsRef.current.send(JSON.stringify({ type: 'listen', unsquelched: true }));
-          }
-        } else {
-          savedAutoSquelchRef.current = params.squelchThreshold;
-          setLiveUnsquelched(false);
-          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-            wsRef.current.send(JSON.stringify({ type: 'listen', unsquelched: false }));
-          }
+    // Optimistic UI updates
+    if (params.frequencyHz) setFrequencyHz(params.frequencyHz);
+    if (params.modulation) setModulation(params.modulation);
+    if (params.squelchThreshold !== undefined) {
+      setSquelchThreshold(params.squelchThreshold);
+      if (params.squelchThreshold <= -98) {
+        setLiveUnsquelched(true);
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({ type: 'listen', unsquelched: true }));
+        }
+      } else {
+        savedAutoSquelchRef.current = params.squelchThreshold;
+        setLiveUnsquelched(false);
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({ type: 'listen', unsquelched: false }));
         }
       }
+      // If user manually adjusts squelch or selects a preset, exit Auto Squelch mode
+      setIsAutoSquelch(false);
+    }
+    if (params.rfGain !== undefined) setRfGain(params.rfGain);
+    if (params.ppmOffset !== undefined) setPpmOffset(params.ppmOffset);
+
+    try {
       const res = await authFetch('/api/radio/tune', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -307,6 +317,25 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
         if (data.ppm_offset !== undefined) setPpmOffset(data.ppm_offset);
       }
     } catch {}
+  };
+
+  // Toggle Auto Squelch mode: computes optimal threshold ~6 dBFS above current noise floor
+  const handleToggleAutoSquelch = async () => {
+    const nextAuto = !isAutoSquelch;
+    setIsAutoSquelch(nextAuto);
+    if (nextAuto) {
+      // Calculate optimal squelch threshold above RF noise floor, clamped between -85 and -15 dBFS
+      const optimal = Math.min(-15.0, Math.max(-85.0, Math.round((liveRssi + 6.0) * 10) / 10));
+      setSquelchThreshold(optimal);
+      savedAutoSquelchRef.current = optimal;
+      try {
+        await authFetch('/api/radio/tune', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ squelch_threshold: optimal }),
+        });
+      } catch {}
+    }
   };
 
   // Presets Handlers
@@ -565,6 +594,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
             presets={presets}
             dspFilterActive={dspFilterActive}
             onToggleDspFilter={() => setDspFilterActive(!dspFilterActive)}
+            isAutoSquelch={isAutoSquelch}
+            onToggleAutoSquelch={handleToggleAutoSquelch}
             liveUnsquelched={liveUnsquelched}
             onToggleLiveMonitor={handleToggleLiveMonitor}
             onTune={handleTune}
