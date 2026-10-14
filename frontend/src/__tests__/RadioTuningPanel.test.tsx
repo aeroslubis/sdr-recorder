@@ -59,7 +59,7 @@ describe('RadioTuningPanel & SMeterBar & DongleConfigModal & TopBar', () => {
   });
 
 
-  test('SMeterBar renders RSSI value, squelch needle, and open/closed state', () => {
+  test('SMeterBar renders RSSI value and squelch threshold readout cleanly', () => {
     const handleSquelchChange = jest.fn();
     const { rerender } = render(
       <SMeterBar
@@ -71,7 +71,8 @@ describe('RadioTuningPanel & SMeterBar & DongleConfigModal & TopBar', () => {
     );
 
     expect(screen.getByText(/-35\.0 dBFS/i)).toBeInTheDocument();
-    expect(screen.getByText(/OPEN/i)).toBeInTheDocument();
+    expect(screen.getByText(/-42\.0 dBFS/i)).toBeInTheDocument();
+    expect(screen.queryByText(/OPEN/i)).not.toBeInTheDocument();
 
     rerender(
       <SMeterBar
@@ -82,7 +83,7 @@ describe('RadioTuningPanel & SMeterBar & DongleConfigModal & TopBar', () => {
       />
     );
     expect(screen.getByText(/-70\.0 dBFS/i)).toBeInTheDocument();
-    expect(screen.getByText(/CLOSED/i)).toBeInTheDocument();
+    expect(screen.queryByText(/CLOSED/i)).not.toBeInTheDocument();
   });
 
   test('DongleConfigModal renders BrowSDR settings and handles save/restart', async () => {

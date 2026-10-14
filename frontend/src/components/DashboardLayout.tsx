@@ -11,7 +11,6 @@ import { DongleHardwareConfig } from './DongleConfigModal';
 import { WebAudioPlayer } from '../audio/WebAudioPlayer';
 import { formatDate } from './HistoryDatePicker';
 import { NoDeviceModal } from './NoDeviceModal';
-import { Filter, Radio } from 'lucide-react';
 
 export interface DashboardLayoutProps {
   className?: string;
@@ -554,7 +553,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
       {/* 2. Responsive 3-Column Dashboard Body */}
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden">
         {/* Left Column: Radio Tuning Panel (300px) */}
-        <div className="w-full lg:w-72 xl:w-80 shrink-0 border-r border-charcoal bg-obsidian/40 overflow-y-auto h-full min-h-0">
+        <div className="w-full lg:w-72 xl:w-80 shrink-0 bg-obsidian/40 overflow-y-auto h-full min-h-0">
           <RadioTuningPanel
             frequencyHz={frequencyHz}
             modulation={modulation}
@@ -564,6 +563,10 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
             rssi={liveRssi}
             squelchOpen={squelchOpen}
             presets={presets}
+            dspFilterActive={dspFilterActive}
+            onToggleDspFilter={() => setDspFilterActive(!dspFilterActive)}
+            liveUnsquelched={liveUnsquelched}
+            onToggleLiveMonitor={handleToggleLiveMonitor}
             onTune={handleTune}
             onCreatePreset={handleCreatePreset}
             onUpdatePreset={handleCreatePreset}
@@ -574,7 +577,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
         {/* Center Column: Live Monitor, Spectrum, Timeline Scrubber & Playback Controls */}
         <main className="flex-1 min-w-0 min-h-0 flex flex-col overflow-y-auto p-4 md:p-6 gap-4 bg-obsidian h-full">
           {/* Live Audio Monitor & Telemetry Bar */}
-          <div className="bg-ash/80 backdrop-blur border border-charcoal rounded-cards px-4 py-3 flex flex-wrap items-center justify-between gap-3 select-none">
+          <div className="bg-ash/80 backdrop-blur border border-charcoal rounded-cards px-4 py-3 flex items-center justify-between gap-3 select-none">
             {/* Live Reception Status */}
             <div className="flex items-center gap-3 font-mono text-xs">
               <div
@@ -588,14 +591,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
                     : 'bg-smoke'
                 }`}
               />
-              <span className="font-semibold text-snow">
+              <span className="font-semibold text-snow inline-block min-w-[95px]">
                 {!hardwareConnected
-                  ? 'RECORDING STOPPED (TIDAK ADA SDR DEVICE)'
-                  : isRecording
-                  ? 'RECORDING TRANSMISSION'
-                  : squelchOpen
-                  ? 'CARRIER DETECTED (OPEN)'
-                  : 'MONITORING SQUELCH'}
+                  ? 'OFFLINE'
+                  : isRecording || squelchOpen
+                  ? 'RECORDING'
+                  : 'MONITORING'}
               </span>
               <span className="text-smoke">·</span>
               <span className="text-silver-mist">
@@ -604,41 +605,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
                   {liveRssi.toFixed(1)} dBFS
                 </span>
               </span>
-            </div>
-
-            {/* Live Audio Controls */}
-            <div className="flex items-center gap-3">
-              {/* Voice DSP Filter Toggle */}
-              <button
-                type="button"
-                onClick={() => setDspFilterActive(!dspFilterActive)}
-                aria-label="DSP Voice Filter"
-                title="Toggle 300Hz-3kHz Voice Bandpass Filter"
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-pill border text-xs font-mono transition-colors cursor-pointer ${
-                  dspFilterActive
-                    ? 'bg-phosphor-green/20 border-phosphor-green text-phosphor-green font-medium'
-                    : 'bg-obsidian border-charcoal hover:border-slate text-silver-mist hover:text-snow'
-                }`}
-              >
-                <Filter className="w-3.5 h-3.5" />
-                <span>DSP Filter {dspFilterActive ? 'ON' : 'OFF'}</span>
-              </button>
-
-              {/* Squelch Bypass Button */}
-              <button
-                type="button"
-                onClick={handleToggleLiveMonitor}
-                aria-label="Live Squelch Bypass"
-                title={liveUnsquelched ? 'Restore Automatic Squelch' : 'Bypass Squelch to Listen Continuously'}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-pill border text-xs font-mono transition-colors cursor-pointer ${
-                  liveUnsquelched
-                    ? 'bg-amber-400/20 border-amber-400 text-amber-300 font-medium'
-                    : 'bg-obsidian border-charcoal hover:border-slate text-silver-mist hover:text-snow'
-                }`}
-              >
-                <Radio className="w-3.5 h-3.5" />
-                <span>{liveUnsquelched ? 'Squelch BYPASS' : 'Squelch AUTO'}</span>
-              </button>
             </div>
           </div>
 

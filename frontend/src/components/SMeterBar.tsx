@@ -85,17 +85,6 @@ export const SMeterBar: React.FC<SMeterBarProps> = ({
           <span className={isBypass ? 'text-amber-400 font-semibold' : 'text-silver-mist'}>
             {isBypass ? 'BYPASS' : `${clampedThreshold.toFixed(1)} dBFS`}
           </span>
-          <span
-            className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-medium tracking-wide transition-colors ${
-              isBypass
-                ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40'
-                : squelchOpen
-                ? 'bg-phosphor-green/20 text-phosphor-green border border-phosphor-green/40'
-                : 'bg-charcoal text-smoke border border-slate'
-            }`}
-          >
-            {isBypass ? 'OPEN (BYPASS)' : squelchOpen ? 'OPEN' : 'CLOSED'}
-          </span>
         </div>
       </div>
 

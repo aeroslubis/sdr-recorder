@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { SMeterBar } from './SMeterBar';
-import { Radio, BookmarkCheck, MoreVertical, Edit2, Play, Trash2, X, AlertCircle } from 'lucide-react';
+import { Radio, BookmarkCheck, MoreVertical, Edit2, Play, Trash2, X, AlertCircle, Filter } from 'lucide-react';
 import { validateFrequency } from './SettingsModal';
 
 export interface PresetItem {
@@ -21,6 +21,10 @@ export interface RadioTuningPanelProps {
   rfGain?: number;
   ppmOffset?: number;
   presets?: PresetItem[];
+  dspFilterActive?: boolean;
+  onToggleDspFilter?: () => void;
+  liveUnsquelched?: boolean;
+  onToggleLiveMonitor?: () => void;
   onTune: (params: {
     frequencyHz?: number;
     modulation?: string;
@@ -65,6 +69,10 @@ export const RadioTuningPanel: React.FC<RadioTuningPanelProps> = ({
   rfGain = 38.6,
   ppmOffset = 0,
   presets = DEFAULT_PRESETS,
+  dspFilterActive = false,
+  onToggleDspFilter,
+  liveUnsquelched = false,
+  onToggleLiveMonitor,
   onTune,
   onUpdatePreset,
   onDeletePreset,
@@ -132,7 +140,7 @@ export const RadioTuningPanel: React.FC<RadioTuningPanelProps> = ({
 
   return (
     <aside
-      className={`w-[280px] flex-shrink-0 bg-obsidian border-r border-charcoal flex flex-col h-full overflow-y-auto select-none ${className}`}
+      className={`w-full flex-shrink-0 bg-obsidian flex flex-col h-full overflow-y-auto select-none ${className}`}
       aria-label="Radio Tuning Panel"
     >
       {/* Top Header */}
@@ -170,6 +178,39 @@ export const RadioTuningPanel: React.FC<RadioTuningPanelProps> = ({
             squelchOpen={squelchOpen}
             onSquelchChange={handleSquelchChange}
           />
+
+          {/* Quick DSP Filter & Squelch Auto/Bypass buttons */}
+          <div className="grid grid-cols-2 gap-2 mt-2.5">
+            <button
+              type="button"
+              onClick={onToggleDspFilter}
+              aria-label="DSP Voice Filter"
+              title="Toggle 300Hz-3kHz Voice Bandpass Filter"
+              className={`flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-inputs border text-[11px] font-mono transition-colors cursor-pointer ${
+                dspFilterActive
+                  ? 'bg-phosphor-green/20 border-phosphor-green text-phosphor-green font-medium'
+                  : 'bg-ash border-charcoal hover:border-slate text-silver-mist hover:text-snow'
+              }`}
+            >
+              <Filter className="w-3.5 h-3.5" />
+              <span>DSP {dspFilterActive ? 'ON' : 'OFF'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onToggleLiveMonitor}
+              aria-label="Live Squelch Bypass"
+              title={liveUnsquelched ? 'Restore Automatic Squelch' : 'Bypass Squelch to Listen Continuously'}
+              className={`flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-inputs border text-[11px] font-mono transition-colors cursor-pointer ${
+                liveUnsquelched
+                  ? 'bg-amber-400/20 border-amber-400 text-amber-300 font-medium'
+                  : 'bg-ash border-charcoal hover:border-slate text-silver-mist hover:text-snow'
+              }`}
+            >
+              <Radio className="w-3.5 h-3.5" />
+              <span>{liveUnsquelched ? 'SQL BYPASS' : 'SQL AUTO'}</span>
+            </button>
+          </div>
         </div>
 
         {/* Channel Presets List */}

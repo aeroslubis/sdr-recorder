@@ -98,9 +98,25 @@ export const LiveSpectrumVisualizer: React.FC<LiveSpectrumVisualizerProps> = ({
 
         // If no real audio node data, generate realistic SDR RF spectrum based on squelch and RSSI
         if (hasRealAudio) {
-          const step = Math.floor(dataArray.length / numBars) || 1;
+          // Radio voice audio (AM/NFM) is concentrated in the speech formant range (~150Hz to ~4500Hz).
+          // Higher FFT bins (> 4.5kHz) have virtually zero energy in radio speech.
+          // We distribute the 64 bars across the active voice frequency bins using a log/perceptual curve
+          // so all 64 bars animate dynamically across the entire width of the spectrum during playback.
+          const maxVoiceBin = Math.min(
+            dataArray.length - 1,
+            Math.max(16, Math.floor(dataArray.length * 0.42))
+          );
           for (let i = 0; i < numBars; i++) {
-            displayData[i] = dataArray[i * step] / 255.0;
+            const frac = i / (numBars - 1);
+            const curvedFrac = Math.pow(frac, 1.3);
+            const binIndex = Math.min(
+              maxVoiceBin,
+              Math.max(1, Math.round(curvedFrac * maxVoiceBin))
+            );
+            const bPrev = Math.max(0, binIndex - 1);
+            const bNext = Math.min(dataArray.length - 1, binIndex + 1);
+            const avgVal = (dataArray[bPrev] + dataArray[binIndex] * 2 + dataArray[bNext]) / 4;
+            displayData[i] = Math.min(0.98, (avgVal / 255.0) * 1.25);
           }
         } else {
           // Base noise floor based on RSSI (-100 dBFS = ~0.08, -50 dBFS = ~0.25)
@@ -211,10 +227,12 @@ export const LiveSpectrumVisualizer: React.FC<LiveSpectrumVisualizerProps> = ({
             <span className="text-red-400 font-medium">DISCONNECTED</span>
           ) : (
             <>
-              <span className={squelchOpen ? 'text-phosphor-green font-medium' : 'text-smoke'}>
-                {squelchOpen ? 'CARRIER ACTIVE' : 'SQUELCHED'}
-              </span>
-              <span className="text-smoke">·</span>
+              {squelchOpen && (
+                <>
+                  <span className="text-phosphor-green font-medium">CARRIER ACTIVE</span>
+                  <span className="text-smoke">·</span>
+                </>
+              )}
               <span className="text-silver-mist">
                 {rssi.toFixed(1)} <span className="text-smoke">dBFS</span>
               </span>
