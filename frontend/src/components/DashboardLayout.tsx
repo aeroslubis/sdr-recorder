@@ -10,7 +10,7 @@ import { LiveSpectrumVisualizer } from './LiveSpectrumVisualizer';
 import { DongleHardwareConfig } from './DongleConfigModal';
 import { WebAudioPlayer } from '../audio/WebAudioPlayer';
 import { formatDate } from './HistoryDatePicker';
-import { Volume2, VolumeX, Filter, Radio } from 'lucide-react';
+import { Filter, Radio } from 'lucide-react';
 
 export interface DashboardLayoutProps {
   className?: string;
@@ -30,6 +30,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
   const [rfGain, setRfGain] = useState<number>(38.6);
   const [ppmOffset, setPpmOffset] = useState<number>(0);
   const [isSimulator, setIsSimulator] = useState<boolean>(true);
+  const [hardwareConnected, setHardwareConnected] = useState<boolean>(true);
   const [presets, setPresets] = useState<PresetItem[]>([]);
 
   // Live WebSocket Telemetry & Audio Streaming
@@ -37,12 +38,10 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
   const [squelchOpen, setSquelchOpen] = useState<boolean>(false);
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [liveUnsquelched, setLiveUnsquelched] = useState<boolean>(false);
-  const [isLiveListening, setIsLiveListening] = useState<boolean>(true);
-  const isLiveListeningRef = useRef<boolean>(true);
-
-  useEffect(() => {
-    isLiveListeningRef.current = isLiveListening;
-  }, [isLiveListening]);
+  const [volume, setVolume] = useState<number>(0.8);
+  const volumeRef = useRef<number>(0.8);
+  const savedVolumeRef = useRef<number>(0.8);
+  const savedAutoSquelchRef = useRef<number>(-42.0);
 
   // Archive & Timeline state
   const [timelineTransmissions, setTimelineTransmissions] = useState<TransmissionInterval[]>([]);
@@ -54,7 +53,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [playbackRate, setPlaybackRate] = useState<number>(1.0);
   const [dspFilterActive, setDspFilterActive] = useState<boolean>(false);
-  const [volume, setVolume] = useState<number>(1.0);
   const [activeCallTitle, setActiveCallTitle] = useState<string>('');
 
   // Unified Settings Modal
@@ -127,10 +125,16 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
         if (data) {
           if (data.frequency_hz) setFrequencyHz(data.frequency_hz);
           if (data.modulation) setModulation(data.modulation);
-          if (data.squelch_threshold !== undefined) setSquelchThreshold(data.squelch_threshold);
+          if (data.squelch_threshold !== undefined) {
+            setSquelchThreshold(data.squelch_threshold);
+            if (data.squelch_threshold > -98) {
+              savedAutoSquelchRef.current = data.squelch_threshold;
+            }
+          }
           if (data.rf_gain !== undefined) setRfGain(data.rf_gain);
           if (data.ppm_offset !== undefined) setPpmOffset(data.ppm_offset);
           if (data.is_simulator !== undefined) setIsSimulator(data.is_simulator);
+          if (data.hardware_connected !== undefined) setHardwareConnected(data.hardware_connected);
         }
       })
       .catch(() => {});
@@ -207,10 +211,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
               if (msg.recording !== undefined) setIsRecording(msg.recording);
               if (msg.frequency_hz !== undefined) setFrequencyHz(msg.frequency_hz);
               if (msg.modulation !== undefined) setModulation(msg.modulation);
+              if (msg.hardware_connected !== undefined) setHardwareConnected(msg.hardware_connected);
+              if (msg.is_simulator !== undefined) setIsSimulator(msg.is_simulator);
             }
           } catch {}
         } else if (event.data instanceof ArrayBuffer) {
-          if (isLiveListeningRef.current && audioPlayerRef.current) {
+          if (volumeRef.current > 0 && audioPlayerRef.current) {
             audioPlayerRef.current.playPcmChunk(event.data, 24000);
           }
         }
@@ -237,6 +243,20 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
     ppmOffset?: number;
   }) => {
     try {
+      if (params.squelchThreshold !== undefined) {
+        if (params.squelchThreshold <= -98) {
+          setLiveUnsquelched(true);
+          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+            wsRef.current.send(JSON.stringify({ type: 'listen', unsquelched: true }));
+          }
+        } else {
+          savedAutoSquelchRef.current = params.squelchThreshold;
+          setLiveUnsquelched(false);
+          if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+            wsRef.current.send(JSON.stringify({ type: 'listen', unsquelched: false }));
+          }
+        }
+      }
       const res = await authFetch('/api/radio/tune', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -384,17 +404,22 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
     document.body.removeChild(a);
   };
 
-  // Live Speaker Audio Toggle
-  const handleToggleLiveListening = async () => {
-    const next = !isLiveListening;
-    setIsLiveListening(next);
-    isLiveListeningRef.current = next;
-    if (next && audioPlayerRef.current) {
-      await audioPlayerRef.current.resumeContext();
+  // Unified Live & Playback Volume Control Handler
+  const handleVolumeChange = async (newVol: number) => {
+    setVolume(newVol);
+    volumeRef.current = newVol;
+    if (newVol > 0) {
+      savedVolumeRef.current = newVol;
+    }
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.setVolume(newVol);
+      if (newVol > 0) {
+        await audioPlayerRef.current.resumeContext();
+      }
     }
   };
 
-  // Live Unsquelch Monitor toggle
+  // Live Unsquelch Monitor toggle (synchronized with Squelch slider)
   const handleToggleLiveMonitor = async () => {
     const nextState = !liveUnsquelched;
     setLiveUnsquelched(nextState);
@@ -404,6 +429,15 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'listen', unsquelched: nextState }));
     }
+    const targetThreshold = nextState ? -100 : (savedAutoSquelchRef.current || -42.0);
+    setSquelchThreshold(targetThreshold);
+    try {
+      await authFetch('/api/radio/tune', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ squelch_threshold: targetThreshold }),
+      });
+    } catch {}
   };
 
   // Dongle Save Config Handler
@@ -529,26 +563,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
                 <span>DSP Filter {dspFilterActive ? 'ON' : 'OFF'}</span>
               </button>
 
-              {/* Live Speaker Audio Toggle */}
-              <button
-                type="button"
-                onClick={handleToggleLiveListening}
-                aria-label="Live Speaker Audio"
-                title={isLiveListening ? 'Mute Live Audio' : 'Unmute Live Audio'}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-pill border text-xs font-mono transition-colors cursor-pointer ${
-                  isLiveListening
-                    ? 'bg-phosphor-green/20 border-phosphor-green text-phosphor-green font-medium'
-                    : 'bg-obsidian border-charcoal hover:border-slate text-smoke hover:text-snow'
-                }`}
-              >
-                {isLiveListening ? (
-                  <Volume2 className="w-3.5 h-3.5 text-phosphor-green" />
-                ) : (
-                  <VolumeX className="w-3.5 h-3.5 text-smoke" />
-                )}
-                <span>{isLiveListening ? 'SPEAKER LIVE: ON' : 'SPEAKER: MUTED'}</span>
-              </button>
-
               {/* Squelch Bypass Button */}
               <button
                 type="button"
@@ -573,6 +587,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
             modulation={modulation}
             squelchOpen={squelchOpen}
             rssi={liveRssi}
+            hardwareConnected={hardwareConnected}
             analyserNode={audioPlayerRef.current?.getAnalyser() ?? null}
           />
 
@@ -599,7 +614,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
             dspFilterActive={dspFilterActive}
             onToggleDspFilter={() => setDspFilterActive(!dspFilterActive)}
             volume={volume}
-            onVolumeChange={setVolume}
+            onVolumeChange={handleVolumeChange}
             onExportClip={handleExportClip}
             hasActiveCall={Boolean(selectedCallId)}
             activeCallTitle={activeCallTitle}
@@ -607,18 +622,20 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
         </main>
 
         {/* Right Column: Call Log History Panel with HistoryDatePicker */}
-        <CallLogPanel
-          calls={calls}
-          selectedCallId={selectedCallId}
-          playingCallId={isPlaying ? selectedCallId : null}
-          currentDate={selectedDate}
-          onDateChange={setSelectedDate}
-          activeDates={activeDates}
-          onPlay={(call) => handlePlayCall(call.id)}
-          onToggleStar={handleToggleStar}
-          onSelectCall={handleSelectTransmission}
-          onDownload={handleExportClip}
-        />
+        <div className="w-full lg:w-80 xl:w-[340px] h-full max-h-full min-h-0 flex-shrink-0 flex flex-col overflow-hidden">
+          <CallLogPanel
+            calls={calls}
+            selectedCallId={selectedCallId}
+            playingCallId={isPlaying ? selectedCallId : null}
+            currentDate={selectedDate}
+            onDateChange={setSelectedDate}
+            activeDates={activeDates}
+            onPlay={(call) => handlePlayCall(call.id)}
+            onToggleStar={handleToggleStar}
+            onSelectCall={handleSelectTransmission}
+            onDownload={handleExportClip}
+          />
+        </div>
       </div>
 
       {/* Unified Multi-Tab Settings Modal */}

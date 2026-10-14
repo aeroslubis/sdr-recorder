@@ -5,6 +5,7 @@ import logging
 import re
 import shutil
 import subprocess
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
@@ -159,6 +160,8 @@ class SDRReceiver:
 
         # Hardware mode detection
         self._is_simulator = self.force_simulator or not is_hardware_available(self.config.device_index)
+        self._is_hardware_connected = not self._is_simulator
+        self._last_hw_check_time: float = 0.0
 
         # State tracking
         self._running = False
@@ -178,6 +181,10 @@ class SDRReceiver:
     @property
     def is_simulator(self) -> bool:
         return self._is_simulator
+
+    @property
+    def is_hardware_connected(self) -> bool:
+        return self._is_hardware_connected
 
     @property
     def state(self) -> SquelchState:
@@ -244,6 +251,11 @@ class SDRReceiver:
         if not self._process or not self._process.stdout:
             return b"\x00" * self.chunk_bytes
 
+        if self._process.poll() is not None:
+            if not is_hardware_available(self.config.device_index):
+                self._is_hardware_connected = False
+            return b"\x00" * self.chunk_bytes
+
         buf = bytearray()
         while len(buf) < self.chunk_bytes:
             needed = self.chunk_bytes - len(buf)
@@ -253,7 +265,9 @@ class SDRReceiver:
                     timeout=0.08,
                 )
                 if not part:
-                    # EOF from subprocess
+                    # EOF from subprocess (dongle unplugged or process died)
+                    if not is_hardware_available(self.config.device_index):
+                        self._is_hardware_connected = False
                     break
                 buf.extend(part)
             except asyncio.TimeoutError:
@@ -343,17 +357,43 @@ class SDRReceiver:
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.DEVNULL,
                 )
+                self._is_hardware_connected = True
             except Exception as e:
                 logger.warning(f"Failed to spawn rtl_fm ({e}), falling back to MockSDRSimulator.")
                 self._is_simulator = True
+                self._is_hardware_connected = False
 
         while self._running:
             try:
-                if self._is_simulator:
+                if self.force_simulator or self._is_simulator:
                     chunk = await self.simulator.read_chunk()
                 else:
-                    assert self._process is not None
-                    chunk = await self._read_hardware_chunk()
+                    if not self._is_hardware_connected:
+                        chunk = b"\x00" * self.chunk_bytes
+                        await asyncio.sleep(self.chunk_ms / 1000.0)
+                        now = time.monotonic()
+                        if now - self._last_hw_check_time > 2.0:
+                            self._last_hw_check_time = now
+                            if is_hardware_available(self.config.device_index):
+                                logger.info(f"RTL-SDR dongle {self.config.device_index} reconnected. Restarting...")
+                                try:
+                                    if self._process:
+                                        self._process.kill()
+                                except Exception:
+                                    pass
+                                cmd = self.build_rtl_fm_command()
+                                try:
+                                    self._process = await asyncio.create_subprocess_exec(
+                                        *cmd,
+                                        stdout=asyncio.subprocess.PIPE,
+                                        stderr=asyncio.subprocess.DEVNULL,
+                                    )
+                                    self._is_hardware_connected = True
+                                except Exception as e:
+                                    logger.warning(f"Failed to respawn rtl_fm on reconnect: {e}")
+                    else:
+                        assert self._process is not None
+                        chunk = await self._read_hardware_chunk()
 
                 if not chunk:
                     break
@@ -361,8 +401,10 @@ class SDRReceiver:
                 await self._process_audio_chunk(chunk)
 
             except asyncio.IncompleteReadError:
-                logger.warning("RTL-SDR stream reached EOF. Restarting or terminating.")
-                break
+                logger.warning("RTL-SDR stream reached EOF.")
+                if not is_hardware_available(self.config.device_index):
+                    self._is_hardware_connected = False
+                await asyncio.sleep(0.05)
             except asyncio.CancelledError:
                 break
             except Exception as e:

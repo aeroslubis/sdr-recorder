@@ -67,6 +67,8 @@ export const SMeterBar: React.FC<SMeterBarProps> = ({
     [onSquelchChange]
   );
 
+  const isBypass = clampedThreshold <= -98;
+
   return (
     <div className={`flex flex-col gap-1.5 w-full select-none ${className}`}>
       {/* Readout Header */}
@@ -80,15 +82,19 @@ export const SMeterBar: React.FC<SMeterBarProps> = ({
 
         <div className="flex items-center gap-2">
           <span className="text-smoke text-[11px] font-sans">SQL:</span>
-          <span className="text-silver-mist">{clampedThreshold.toFixed(1)} dBFS</span>
+          <span className={isBypass ? 'text-amber-400 font-semibold' : 'text-silver-mist'}>
+            {isBypass ? 'BYPASS' : `${clampedThreshold.toFixed(1)} dBFS`}
+          </span>
           <span
             className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-medium tracking-wide transition-colors ${
-              squelchOpen
+              isBypass
+                ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40'
+                : squelchOpen
                 ? 'bg-phosphor-green/20 text-phosphor-green border border-phosphor-green/40'
                 : 'bg-charcoal text-smoke border border-slate'
             }`}
           >
-            {squelchOpen ? 'OPEN' : 'CLOSED'}
+            {isBypass ? 'OPEN (BYPASS)' : squelchOpen ? 'OPEN' : 'CLOSED'}
           </span>
         </div>
       </div>

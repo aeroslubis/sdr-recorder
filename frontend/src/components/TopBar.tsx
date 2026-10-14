@@ -24,8 +24,8 @@ export interface TopBarProps {
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
-  frequencyHz = 118200000,
-  modulation = 'AM',
+  frequencyHz: _frequencyHz = 118200000,
+  modulation: _modulation = 'AM',
   isSimulator = false,
   diskUsedGB = 14.8,
   diskTotalGB = 100,
@@ -63,7 +63,6 @@ export const TopBar: React.FC<TopBarProps> = ({
   };
 
   const diskPercent = Math.min(100, Math.round((diskUsedGB / (diskTotalGB || 1)) * 100));
-  const freqMHz = (frequencyHz / 1e6).toFixed(3);
 
   return (
     <header
@@ -78,13 +77,6 @@ export const TopBar: React.FC<TopBarProps> = ({
           </div>
           <span className="font-medium text-snow text-lg tracking-tight">
             [●] SDR RECORDER
-          </span>
-        </div>
-
-        {/* Active Frequency & Mode Badge */}
-        <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-ash border border-charcoal rounded-pill font-mono text-xs">
-          <span className="text-phosphor-green font-medium">
-            {freqMHz} MHz · {modulation}
           </span>
         </div>
       </div>

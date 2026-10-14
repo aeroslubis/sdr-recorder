@@ -40,6 +40,7 @@ def get_radio_status(request: Request, db: sqlite3.Connection = Depends(get_db))
     if receiver:
         cfg = receiver.config.to_dict()
         cfg["is_simulator"] = receiver.is_simulator
+        cfg["hardware_connected"] = getattr(receiver, "is_hardware_connected", not receiver.is_simulator)
         cfg["is_running"] = receiver.is_running
         cfg["last_rssi"] = receiver.last_rssi
         cfg["squelch_state"] = (
@@ -49,6 +50,7 @@ def get_radio_status(request: Request, db: sqlite3.Connection = Depends(get_db))
 
     # Fallback to DB configuration if receiver is not attached
     db_config["is_simulator"] = True
+    db_config["hardware_connected"] = False
     db_config["is_running"] = False
     db_config["last_rssi"] = -100.0
     db_config["squelch_state"] = "closed"

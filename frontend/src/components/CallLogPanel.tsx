@@ -132,11 +132,11 @@ export const CallLogPanel: React.FC<CallLogPanelProps> = ({
 
   return (
     <aside
-      className={`w-full lg:w-80 xl:w-[340px] bg-obsidian border-l border-charcoal flex flex-col h-full select-none ${className}`}
+      className={`w-full lg:w-80 xl:w-[340px] bg-obsidian border-l border-charcoal flex flex-col h-full max-h-full min-h-0 overflow-hidden select-none ${className}`}
       aria-label="Call Log History Panel"
     >
       {/* Top Header & Calendar Date Picker */}
-      <div className="p-3 border-b border-charcoal flex flex-col gap-2.5 bg-obsidian/95 backdrop-blur">
+      <div className="p-3 border-b border-charcoal flex flex-col gap-2.5 bg-obsidian/95 backdrop-blur flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Radio className="w-4 h-4 text-phosphor-green" />
@@ -202,7 +202,7 @@ export const CallLogPanel: React.FC<CallLogPanelProps> = ({
       </div>
 
       {/* Call Cards List */}
-      <div className="flex-1 overflow-y-auto p-2.5 space-y-2">
+      <div tabIndex={0} aria-label="Call History List" className="flex-1 min-h-0 overflow-y-auto p-2.5 space-y-2 focus:outline-none">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center h-48 text-silver-mist gap-2">
             <div className="w-4 h-4 border-2 border-phosphor-green border-t-transparent rounded-full animate-spin" />

@@ -137,7 +137,7 @@ describe('RadioTuningPanel & SMeterBar & DongleConfigModal & TopBar', () => {
     );
 
     expect(screen.getByText(/\[●\] SDR RECORDER/i)).toBeInTheDocument();
-    expect(screen.getByText(/118\.200 MHz · AM/i)).toBeInTheDocument();
+    expect(screen.queryByText(/118\.200 MHz · AM/i)).not.toBeInTheDocument();
     expect(screen.getByText(/RTL-SDR ONLINE/i)).toBeInTheDocument();
     expect(screen.getByText(/DISK: 14\.8 GB \/ 100 GB \(15%\)/i)).toBeInTheDocument();
 
