@@ -141,8 +141,9 @@ describe('RadioTuningPanel & SMeterBar & DongleConfigModal & TopBar', () => {
 
     expect(screen.getByText(/\[●\] SDR RECORDER/i)).toBeInTheDocument();
     expect(screen.queryByText(/118\.200 MHz · AM/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/RTL-SDR ONLINE/i)).toBeInTheDocument();
-    expect(screen.getByText(/DISK: 14\.8 GB \/ 100 GB \(15%\)/i)).toBeInTheDocument();
+    expect(screen.getByTestId('disk-quota-bar')).toBeInTheDocument();
+    expect(screen.getByTitle(/Disk Quota: 14\.8 GB \/ 100 GB \(15%\)/i)).toBeInTheDocument();
+    expect(screen.queryByText(/DISK: 14\.8 GB/i)).not.toBeInTheDocument();
 
     // Admin dropdown
     const adminButton = screen.getByRole('button', { name: /admin/i });

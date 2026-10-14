@@ -114,14 +114,15 @@ export const TopBar: React.FC<TopBarProps> = ({
           </div>
         )}
 
-        {/* Single-line Storage Quota Pill */}
-        <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-ash border border-charcoal rounded-pill text-xs font-mono text-silver-mist whitespace-nowrap">
+        {/* Storage Quota Bar (icon + bar only, no percentage or gigabyte text) */}
+        <div
+          className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-ash border border-charcoal rounded-pill shrink-0"
+          title={`Disk Quota: ${diskUsedGB.toFixed(1)} GB / ${diskTotalGB} GB (${diskPercent}%)`}
+        >
           <HardDrive className="w-3.5 h-3.5 text-silver-mist shrink-0" />
-          <span>
-            DISK: {diskUsedGB.toFixed(1)} GB / {diskTotalGB} GB ({diskPercent}%)
-          </span>
-          <div className="w-14 h-1.5 bg-obsidian rounded-full overflow-hidden border border-charcoal/80 shrink-0">
+          <div className="w-20 sm:w-24 h-2 bg-obsidian rounded-full overflow-hidden border border-charcoal/80 shrink-0">
             <div
+              data-testid="disk-quota-bar"
               className={`h-full transition-all duration-300 rounded-full ${
                 diskPercent > 90
                   ? 'bg-red-400'

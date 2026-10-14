@@ -278,17 +278,9 @@ export const LiveSpectrumVisualizer: React.FC<LiveSpectrumVisualizerProps> = ({
           {!hardwareConnected ? (
             <span className="text-red-400 font-medium">DISCONNECTED</span>
           ) : (
-            <>
-              {squelchOpen && (
-                <>
-                  <span className="text-phosphor-green font-medium">CARRIER ACTIVE</span>
-                  <span className="text-smoke">·</span>
-                </>
-              )}
-              <span className="text-silver-mist">
-                {rssi.toFixed(1)} <span className="text-smoke">dBFS</span>
-              </span>
-            </>
+            squelchOpen && (
+              <span className="text-phosphor-green font-medium">CARRIER ACTIVE</span>
+            )
           )}
         </div>
       </div>

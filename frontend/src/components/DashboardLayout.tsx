@@ -701,19 +701,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
                     : 'bg-smoke'
                 }`}
               />
-              <span className="font-semibold text-snow inline-block min-w-[95px]">
+              <span className="font-semibold text-snow inline-block">
                 {!hardwareConnected
                   ? 'OFFLINE'
                   : isRecording || squelchOpen
                   ? 'RECORDING'
                   : 'MONITORING'}
-              </span>
-              <span className="text-smoke">·</span>
-              <span className="text-silver-mist">
-                RSSI:{' '}
-                <span className={!hardwareConnected ? 'text-red-400' : 'text-phosphor-green'}>
-                  {liveRssi.toFixed(1)} dBFS
-                </span>
               </span>
             </div>
           </div>
