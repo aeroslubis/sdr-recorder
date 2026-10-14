@@ -381,43 +381,61 @@ export const TimelineScrubber: React.FC<TimelineScrubberProps> = ({
     }
   };
 
-  // Wheel zoom around mouse pointer position
-  const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
+  const viewStartMsRef = useRef(viewStartMs);
+  const viewEndMsRef = useRef(viewEndMs);
+  useEffect(() => {
+    viewStartMsRef.current = viewStartMs;
+    viewEndMsRef.current = viewEndMs;
+  }, [viewStartMs, viewEndMs]);
+
+  // Native non-passive wheel event listener to zoom timeline without zooming browser WebUI or scrolling page
+  useEffect(() => {
+    const container = containerRef.current;
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!container || !canvas) return;
 
-    const rect = canvas.getBoundingClientRect();
-    const cursorX = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
-    const cursorFraction = cursorX / rect.width;
-    const cursorTimeMs = canvasXToTimeMs(cursorX, viewStartMs, viewEndMs, canvas.width);
+    const onWheel = (e: WheelEvent) => {
+      // Prevent browser default page zoom (Ctrl+wheel, trackpad pinch) and window scrolling
+      e.preventDefault();
+      e.stopPropagation();
 
-    const zoomFactor = e.deltaY < 0 ? 0.75 : 1.33;
-    const currentSpan = viewEndMs - viewStartMs;
-    const minSpan = 60_000; // minimum 1 min zoom
-    const maxSpan = DAY_MS;  // 24h
+      const rect = canvas.getBoundingClientRect();
+      const cursorX = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+      const cursorFraction = rect.width > 0 ? cursorX / rect.width : 0.5;
+      const cursorTimeMs = canvasXToTimeMs(cursorX, viewStartMsRef.current, viewEndMsRef.current, canvas.width);
 
-    let newSpan = Math.max(minSpan, Math.min(maxSpan, currentSpan * zoomFactor));
+      const zoomFactor = e.deltaY < 0 ? 0.75 : 1.33;
+      const currentSpan = viewEndMsRef.current - viewStartMsRef.current;
+      const minSpan = 60_000; // minimum 1 min zoom
+      const maxSpan = DAY_MS;  // 24h
 
-    let newStart = cursorTimeMs - cursorFraction * newSpan;
-    let newEnd = newStart + newSpan;
+      let newSpan = Math.max(minSpan, Math.min(maxSpan, currentSpan * zoomFactor));
 
-    if (newStart < 0) {
-      newStart = 0;
-      newEnd = Math.min(DAY_MS, newSpan);
-    } else if (newEnd > DAY_MS) {
-      newEnd = DAY_MS;
-      newStart = Math.max(0, DAY_MS - newSpan);
-    }
+      let newStart = cursorTimeMs - cursorFraction * newSpan;
+      let newEnd = newStart + newSpan;
 
-    setViewStartMs(newStart);
-    setViewEndMs(newEnd);
-  };
+      if (newStart < 0) {
+        newStart = 0;
+        newEnd = Math.min(DAY_MS, newSpan);
+      } else if (newEnd > DAY_MS) {
+        newEnd = DAY_MS;
+        newStart = Math.max(0, DAY_MS - newSpan);
+      }
+
+      setViewStartMs(newStart);
+      setViewEndMs(newEnd);
+    };
+
+    container.addEventListener('wheel', onWheel, { passive: false });
+    return () => {
+      container.removeEventListener('wheel', onWheel);
+    };
+  }, []);
 
   return (
     <div
       ref={containerRef}
-      className={`bg-ash border border-charcoal rounded-cards p-3 flex flex-col gap-2 select-none relative ${className}`}
+      className={`bg-ash border border-charcoal rounded-cards p-3 flex flex-col gap-2 select-none relative overscroll-contain ${className}`}
       aria-label="24-Hour Timeline Scrubber"
     >
       {/* Top Header & Zoom Controls */}
@@ -523,7 +541,6 @@ export const TimelineScrubber: React.FC<TimelineScrubberProps> = ({
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerLeave={handlePointerLeave}
-          onWheel={handleWheel}
           className="w-full h-[110px] block cursor-crosshair touch-none"
         />
 

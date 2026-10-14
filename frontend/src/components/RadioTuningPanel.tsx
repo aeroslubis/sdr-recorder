@@ -157,9 +157,6 @@ export const RadioTuningPanel: React.FC<RadioTuningPanelProps> = ({
           <div className="font-mono text-xl text-snow font-semibold tracking-tight">
             {formatFrequencyHz(frequencyHz)}
           </div>
-          <div className="text-[11px] text-smoke font-mono mt-1">
-            {modulation}
-          </div>
         </div>
 
         {/* S-Meter & Squelch Bar */}
