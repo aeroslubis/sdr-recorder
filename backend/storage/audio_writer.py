@@ -31,11 +31,36 @@ def save_transmission(
     else:
         recordings_dir = base_dir / "recordings"
 
-    date_str = event.start_time.strftime("%Y-%m-%d")
+    from backend.utils.timezone import get_active_timezone
+
+    # Determine configured server timezone
+    cfg_tz = "auto"
+    try:
+        cur = db_conn.cursor()
+        cur.execute("SELECT server_timezone FROM system_settings WHERE id = 1")
+        row = cur.fetchone()
+        if row and len(row) > 0 and row[0]:
+            cfg_tz = row[0]
+    except Exception:
+        pass
+    active_tz = get_active_timezone(cfg_tz)
+
+    # Convert start_time and end_time to server local timezone for intuitive folder, file, and DB records
+    if hasattr(event.start_time, "astimezone"):
+        local_start = event.start_time.astimezone(active_tz)
+    else:
+        local_start = event.start_time
+
+    if hasattr(event.end_time, "astimezone"):
+        local_end = event.end_time.astimezone(active_tz)
+    else:
+        local_end = event.end_time
+
+    date_str = local_start.strftime("%Y-%m-%d")
     target_dir = recordings_dir / date_str
     target_dir.mkdir(parents=True, exist_ok=True)
 
-    ts_str = event.start_time.strftime("%Y%m%d_%H%M%S")
+    ts_str = local_start.strftime("%Y%m%d_%H%M%S")
     base_name = f"ch_{event.frequency_hz}_{ts_str}"
     ext = audio_format.lower().lstrip(".")
 
@@ -76,10 +101,10 @@ def save_transmission(
 
     file_size_bytes = final_file.stat().st_size
     start_time_iso = (
-        event.start_time.isoformat() if hasattr(event.start_time, "isoformat") else str(event.start_time)
+        local_start.isoformat() if hasattr(local_start, "isoformat") else str(local_start)
     )
     end_time_iso = (
-        event.end_time.isoformat() if hasattr(event.end_time, "isoformat") else str(event.end_time)
+        local_end.isoformat() if hasattr(local_end, "isoformat") else str(local_end)
     )
 
     cursor = db_conn.cursor()

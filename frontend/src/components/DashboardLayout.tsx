@@ -22,6 +22,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
   // Selected date for playback
   const [selectedDate, setSelectedDate] = useState<string>(() => formatDate(new Date()));
   const [activeDates, setActiveDates] = useState<string[]>([]);
+  const [serverTimeStr, setServerTimeStr] = useState<string>('');
+  const [serverTzStr, setServerTzStr] = useState<string>('');
 
   // Hardware and Radio state
   const [frequencyHz, setFrequencyHz] = useState<number>(118200000);
@@ -191,7 +193,44 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
         if (data) setStorageSettings(data);
       })
       .catch(() => {});
+
+    authFetch('/api/system/time')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) {
+          if (data.server_time_formatted) {
+            setServerTimeStr(data.server_time_formatted.slice(11, 19));
+          }
+          if (data.tz_abbreviation) {
+            setServerTzStr(data.tz_abbreviation);
+          }
+          if (data.server_time_iso && data.server_time_iso.length >= 10) {
+            setSelectedDate(data.server_time_iso.slice(0, 10));
+          }
+        }
+      })
+      .catch(() => {});
   }, [authFetch]);
+
+  // Clock ticker every second
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setServerTimeStr((prev) => {
+        if (!prev || prev.length < 8) return prev;
+        const [h, m, s] = prev.split(':').map(Number);
+        if (isNaN(h) || isNaN(m) || isNaN(s)) return prev;
+        const nextSec = s + 1;
+        const carryMin = Math.floor(nextSec / 60);
+        const newS = nextSec % 60;
+        const nextMin = m + carryMin;
+        const carryHour = Math.floor(nextMin / 60);
+        const newM = nextMin % 60;
+        const newH = (h + carryHour) % 24;
+        return `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}:${String(newS).padStart(2, '0')}`;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Fetch timeline intervals and call log when selectedDate changes
   useEffect(() => {
@@ -580,6 +619,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
         modulation={modulation}
         hardwareConnected={hardwareConnected}
         username={user?.username || 'admin'}
+        serverTime={serverTimeStr}
+        serverTimezone={serverTzStr}
         onOpenSettings={(tab) => {
           setSettingsTab(tab);
           setIsSettingsOpen(true);

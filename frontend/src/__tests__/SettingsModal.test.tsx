@@ -14,7 +14,7 @@ describe('SettingsModal', () => {
     hang_time_ms: 800,
   };
 
-  test('renders unified settings modal with 4 tabs and switches between them', () => {
+  test('renders unified settings modal with 5 tabs and switches between them', () => {
     render(
       <SettingsModal
         isOpen={true}
@@ -34,6 +34,7 @@ describe('SettingsModal', () => {
 
     expect(screen.getByRole('tab', { name: /dongle/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /channel setup/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /recording setup/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /storage/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /password/i })).toBeInTheDocument();
 
@@ -44,6 +45,12 @@ describe('SettingsModal', () => {
     fireEvent.click(screen.getByRole('tab', { name: /channel setup/i }));
     expect(screen.getByText(/Haneda Tower/i)).toBeInTheDocument();
     expect(screen.getByText(/Add New Channel/i)).toBeInTheDocument();
+
+    // Switch to Recording Setup tab
+    fireEvent.click(screen.getByRole('tab', { name: /recording setup/i }));
+    expect(screen.getByText(/Minimum Speech Duration/i)).toBeInTheDocument();
+    expect(screen.getByText(/Server Timezone/i)).toBeInTheDocument();
+    expect(screen.getByText(/Enable Squelch Tail & Pop Suppression/i)).toBeInTheDocument();
 
     // Switch to Storage tab
     fireEvent.click(screen.getByRole('tab', { name: /storage/i }));

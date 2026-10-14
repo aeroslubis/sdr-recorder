@@ -162,6 +162,9 @@ class SDRReceiver:
         on_transmission_end_callback: Optional[Callable] = None,
         sample_rate: int = 24000,
         chunk_ms: int = 50,
+        min_speech_duration_ms: int = 200,
+        max_transmission_sec: int = 300,
+        enable_squelch_tail_suppression: bool = True,
     ):
         self.config = config or DongleConfig()
         self.on_chunk_callback = on_chunk_callback
@@ -198,6 +201,11 @@ class SDRReceiver:
         self._current_transmission_start: Optional[datetime] = None
         self._current_transmission_active_chunks: int = 0
         self._current_transmission_peak_rssi: float = -100.0
+
+        # Recording Setup parameters
+        self.min_speech_duration_ms: int = int(min_speech_duration_ms)
+        self.max_transmission_sec: int = int(max_transmission_sec)
+        self.enable_squelch_tail_suppression: bool = bool(enable_squelch_tail_suppression)
 
     @property
     def is_running(self) -> bool:
@@ -415,10 +423,9 @@ class SDRReceiver:
                 audio_data = b"".join(self._current_transmission_chunks)
                 duration_sec = len(audio_data) / float(self.sample_rate * 2)
 
-                # Suppress false triggers / squelch tails on PTT release:
-                # If active open squelch lasted less than 3 chunks (< 150 ms),
-                # it was just a transient pop / squelch tail burst, not genuine speech.
-                if self._current_transmission_active_chunks >= 3:
+                # Suppress false triggers / squelch tails on PTT release based on configured min_speech_duration_ms:
+                min_chunks = max(1, int(round(self.min_speech_duration_ms / self.chunk_ms)))
+                if (not self.enable_squelch_tail_suppression) or (self._current_transmission_active_chunks >= min_chunks):
                     event = TransmissionEvent(
                         audio_data=audio_data,
                         start_time=start_time,
@@ -431,13 +438,35 @@ class SDRReceiver:
                     await self._safe_call(self.on_transmission_end_callback, event)
                 else:
                     logger.debug(
-                        f"Suppressed transient squelch burst (active_chunks={self._current_transmission_active_chunks}, duration={duration_sec:.2f}s)"
+                        f"Suppressed transient squelch burst (active_chunks={self._current_transmission_active_chunks} < {min_chunks}, duration={duration_sec:.2f}s)"
                     )
 
                 self._current_transmission_chunks = []
                 self._current_transmission_start = None
                 self._current_transmission_active_chunks = 0
                 self._current_transmission_peak_rssi = -100.0
+
+        # Cap long-running recordings at max_transmission_sec to prevent runaway files
+        elif self._current_transmission_chunks and (len(self._current_transmission_chunks) * self.chunk_ms / 1000.0 >= self.max_transmission_sec):
+            end_time = datetime.now(timezone.utc)
+            start_time = self._current_transmission_start or end_time
+            audio_data = b"".join(self._current_transmission_chunks)
+            duration_sec = len(audio_data) / float(self.sample_rate * 2)
+
+            event = TransmissionEvent(
+                audio_data=audio_data,
+                start_time=start_time,
+                end_time=end_time,
+                duration_sec=duration_sec,
+                peak_rssi_dbfs=self._current_transmission_peak_rssi,
+                frequency_hz=self.config.frequency_hz,
+                modulation=self.config.modulation,
+            )
+            await self._safe_call(self.on_transmission_end_callback, event)
+            self._current_transmission_chunks = []
+            self._current_transmission_start = datetime.now(timezone.utc)
+            self._current_transmission_active_chunks = 1
+            self._current_transmission_peak_rssi = result.rssi_dbfs
 
         # Dispatch chunk callback
         await self._safe_call(self.on_chunk_callback, filtered_chunk, result)

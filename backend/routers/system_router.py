@@ -5,19 +5,14 @@ import sqlite3
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, Request
-from pydantic import BaseModel, Field
 
 from backend import config
 from backend.auth import get_current_user
 from backend.database import get_db
+from backend.models import SystemSettingsUpdate
+from backend.utils.timezone import get_server_time_info
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
-
-
-class SystemSettingsUpdate(BaseModel):
-    retention_days: Optional[int] = Field(None, ge=1, le=365)
-    max_disk_usage_percent: Optional[int] = Field(None, ge=10, le=99)
-    audio_format: Optional[str] = Field(None, pattern="^(wav|opus)$")
 
 
 
@@ -109,48 +104,113 @@ def get_system_stats(request: Request) -> Dict[str, Any]:
     }
 
 
+@router.get("/time")
+def get_system_time(db: sqlite3.Connection = Depends(get_db)) -> Dict[str, Any]:
+    """Retrieve active server timezone and clock information."""
+    cursor = db.cursor()
+    cursor.execute("SELECT server_timezone FROM system_settings WHERE id = 1")
+    row = cursor.fetchone()
+    configured_tz = row["server_timezone"] if row and "server_timezone" in row.keys() else "auto"
+    return get_server_time_info(configured_tz)
+
+
 @router.get("/settings")
 def get_system_settings(db: sqlite3.Connection = Depends(get_db)) -> Dict[str, Any]:
-    """Retrieve system retention and storage limits."""
+    """Retrieve system retention, recording parameters, and timezone settings."""
     cursor = db.cursor()
-    cursor.execute("SELECT retention_days, max_disk_usage_percent, audio_format FROM system_settings WHERE id = 1")
+    cursor.execute("SELECT * FROM system_settings WHERE id = 1")
     row = cursor.fetchone()
     if not row:
-        return {"retention_days": 14, "max_disk_usage_percent": 90, "audio_format": "opus"}
-    return dict(row)
+        return {
+            "retention_days": 14,
+            "max_disk_usage_percent": 90,
+            "audio_format": "opus",
+            "min_speech_duration_ms": 300,
+            "pre_roll_ms": 500,
+            "hang_time_ms": 1000,
+            "max_transmission_sec": 300,
+            "enable_squelch_tail_suppression": 1,
+            "server_timezone": "auto",
+        }
+    data = dict(row)
+    # Remove primary key 'id' from response if desired or keep
+    data.pop("id", None)
+    return data
 
 
 @router.post("/settings")
 def update_system_settings(
     payload: SystemSettingsUpdate,
+    request: Request,
     db: sqlite3.Connection = Depends(get_db),
 ) -> Dict[str, Any]:
-    """Update system retention and storage quota settings."""
+    """Update system retention, recording thresholds, and timezone settings."""
     cursor = db.cursor()
-    cursor.execute("SELECT retention_days, max_disk_usage_percent, audio_format FROM system_settings WHERE id = 1")
+    cursor.execute("SELECT * FROM system_settings WHERE id = 1")
     row = cursor.fetchone()
-    current = dict(row) if row else {"retention_days": 14, "max_disk_usage_percent": 90, "audio_format": "opus"}
+    current = dict(row) if row else {
+        "retention_days": 14,
+        "max_disk_usage_percent": 90,
+        "audio_format": "opus",
+        "min_speech_duration_ms": 300,
+        "pre_roll_ms": 500,
+        "hang_time_ms": 1000,
+        "max_transmission_sec": 300,
+        "enable_squelch_tail_suppression": 1,
+        "server_timezone": "auto",
+    }
 
-    new_retention = payload.retention_days if payload.retention_days is not None else current["retention_days"]
-    new_disk = payload.max_disk_usage_percent if payload.max_disk_usage_percent is not None else current["max_disk_usage_percent"]
-    new_format = payload.audio_format if payload.audio_format is not None else current["audio_format"]
+    new_retention = payload.retention_days if payload.retention_days is not None else current.get("retention_days", 14)
+    new_disk = payload.max_disk_usage_percent if payload.max_disk_usage_percent is not None else current.get("max_disk_usage_percent", 90)
+    new_format = payload.audio_format if payload.audio_format is not None else current.get("audio_format", "opus")
+    new_min_speech = payload.min_speech_duration_ms if payload.min_speech_duration_ms is not None else current.get("min_speech_duration_ms", 300)
+    new_pre_roll = payload.pre_roll_ms if payload.pre_roll_ms is not None else current.get("pre_roll_ms", 500)
+    new_hang_time = payload.hang_time_ms if payload.hang_time_ms is not None else current.get("hang_time_ms", 1000)
+    new_max_tx = payload.max_transmission_sec if payload.max_transmission_sec is not None else current.get("max_transmission_sec", 300)
+    new_suppress = payload.enable_squelch_tail_suppression if payload.enable_squelch_tail_suppression is not None else current.get("enable_squelch_tail_suppression", 1)
+    new_tz = payload.server_timezone if payload.server_timezone is not None else current.get("server_timezone", "auto")
 
     cursor.execute(
         """
-        INSERT INTO system_settings (id, retention_days, max_disk_usage_percent, audio_format)
-        VALUES (1, ?, ?, ?)
+        INSERT INTO system_settings (
+            id, retention_days, max_disk_usage_percent, audio_format,
+            min_speech_duration_ms, pre_roll_ms, hang_time_ms,
+            max_transmission_sec, enable_squelch_tail_suppression, server_timezone
+        ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
             retention_days = excluded.retention_days,
             max_disk_usage_percent = excluded.max_disk_usage_percent,
-            audio_format = excluded.audio_format
+            audio_format = excluded.audio_format,
+            min_speech_duration_ms = excluded.min_speech_duration_ms,
+            pre_roll_ms = excluded.pre_roll_ms,
+            hang_time_ms = excluded.hang_time_ms,
+            max_transmission_sec = excluded.max_transmission_sec,
+            enable_squelch_tail_suppression = excluded.enable_squelch_tail_suppression,
+            server_timezone = excluded.server_timezone
         """,
-        (new_retention, new_disk, new_format),
+        (new_retention, new_disk, new_format, new_min_speech, new_pre_roll, new_hang_time, new_max_tx, new_suppress, new_tz),
     )
     db.commit()
+
+    # Dynamically apply settings to active SDRReceiver if available
+    receiver = getattr(request.app.state, "receiver", None) if hasattr(request, "app") else None
+    if receiver:
+        receiver.min_speech_duration_ms = int(new_min_speech)
+        receiver.max_transmission_sec = int(new_max_tx)
+        receiver.enable_squelch_tail_suppression = bool(new_suppress)
+        if hasattr(receiver, "squelch_evaluator"):
+            receiver.squelch_evaluator.hang_time_ms = int(new_hang_time)
+            receiver.squelch_evaluator.pre_roll_ms = int(new_pre_roll)
 
     return {
         "retention_days": new_retention,
         "max_disk_usage_percent": new_disk,
         "audio_format": new_format,
+        "min_speech_duration_ms": new_min_speech,
+        "pre_roll_ms": new_pre_roll,
+        "hang_time_ms": new_hang_time,
+        "max_transmission_sec": new_max_tx,
+        "enable_squelch_tail_suppression": new_suppress,
+        "server_timezone": new_tz,
     }
 

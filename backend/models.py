@@ -148,3 +148,21 @@ class SystemSettingsModel(BaseModel):
     retention_days: int = Field(default=14, ge=1, le=365)
     max_disk_usage_percent: int = Field(default=90, ge=10, le=99)
     audio_format: str = Field(default="opus")
+    min_speech_duration_ms: int = Field(default=300, ge=50, le=3000)
+    pre_roll_ms: int = Field(default=500, ge=100, le=2000)
+    hang_time_ms: int = Field(default=1000, ge=200, le=3000)
+    max_transmission_sec: int = Field(default=300, ge=10, le=3600)
+    enable_squelch_tail_suppression: int = Field(default=1, ge=0, le=1)
+    server_timezone: str = Field(default="auto")
+
+
+class SystemSettingsUpdate(BaseModel):
+    retention_days: Optional[int] = Field(None, ge=1, le=365)
+    max_disk_usage_percent: Optional[int] = Field(None, ge=10, le=99)
+    audio_format: Optional[str] = Field(None, pattern="^(wav|opus)$")
+    min_speech_duration_ms: Optional[int] = Field(None, ge=50, le=3000)
+    pre_roll_ms: Optional[int] = Field(None, ge=100, le=2000)
+    hang_time_ms: Optional[int] = Field(None, ge=200, le=3000)
+    max_transmission_sec: Optional[int] = Field(None, ge=10, le=3600)
+    enable_squelch_tail_suppression: Optional[int] = Field(None, ge=0, le=1)
+    server_timezone: Optional[str] = None

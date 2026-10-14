@@ -1,7 +1,7 @@
 """REST API endpoints for NVR recordings, timeline intervals, audio streaming, and call management."""
 import logging
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -13,6 +13,7 @@ from backend.auth import get_current_user
 from backend.database import get_db
 from backend.models import TimelineItem, TransmissionModel, UpdateNotesRequest
 from backend.storage.retention import _parse_datetime
+from backend.utils.timezone import get_server_timezone_from_db
 
 logger = logging.getLogger(__name__)
 
@@ -21,39 +22,45 @@ router = APIRouter(dependencies=[Depends(get_current_user)])
 
 @router.get("/timeline", response_model=List[TimelineItem])
 def get_timeline(
-    date: Optional[str] = Query(None, description="Date in YYYY-MM-DD format (defaults to today UTC)"),
+    date: Optional[str] = Query(None, description="Date in YYYY-MM-DD format (defaults to today in active server timezone)"),
     db: sqlite3.Connection = Depends(get_db),
 ) -> List[TimelineItem]:
     """
     Returns array of transmission intervals for 24h canvas scrubber rendering.
-    Calculates start_ms and end_ms relative to the start of the day.
+    Calculates start_ms and end_ms relative to the start of the day in active server timezone.
     """
+    active_tz = get_server_timezone_from_db(db)
     if not date:
-        date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        date = datetime.now(active_tz).strftime("%Y-%m-%d")
 
     try:
-        day_start = datetime.strptime(date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        day_start = datetime.strptime(date, "%Y-%m-%d").replace(tzinfo=active_tz)
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid date format, expected YYYY-MM-DD",
         )
 
+    prev_date = (day_start - timedelta(days=1)).strftime("%Y-%m-%d")
+    next_date = (day_start + timedelta(days=1)).strftime("%Y-%m-%d")
+
     cursor = db.cursor()
     cursor.execute(
         """
         SELECT id, start_time, end_time, duration_sec, frequency_hz, modulation, peak_rssi_dbfs, is_starred
         FROM transmissions
-        WHERE substr(start_time, 1, 10) = ?
+        WHERE substr(start_time, 1, 10) IN (?, ?, ?)
         ORDER BY start_time ASC
         """,
-        (date,),
+        (prev_date, date, next_date),
     )
     rows = cursor.fetchall()
 
     results: List[TimelineItem] = []
     for r in rows:
-        rec_start = _parse_datetime(r["start_time"])
+        rec_start = _parse_datetime(r["start_time"]).astimezone(active_tz)
+        if rec_start.strftime("%Y-%m-%d") != date:
+            continue
         start_ms = max(0, int((rec_start - day_start).total_seconds() * 1000))
         duration_sec = float(r["duration_sec"])
         end_ms = start_ms + int(duration_sec * 1000)
@@ -80,28 +87,24 @@ def get_active_dates(
     month: Optional[str] = Query(None, description="Month in YYYY-MM format"),
     db: sqlite3.Connection = Depends(get_db),
 ) -> List[str]:
-    """Returns list of distinct YYYY-MM-DD dates having recordings for calendar dots."""
+    """Returns list of distinct YYYY-MM-DD dates having recordings for calendar dots in server timezone."""
+    active_tz = get_server_timezone_from_db(db)
     cursor = db.cursor()
-    if month:
-        cursor.execute(
-            """
-            SELECT DISTINCT substr(start_time, 1, 10) as dt
-            FROM transmissions
-            WHERE substr(start_time, 1, 7) = ?
-            ORDER BY dt ASC
-            """,
-            (month,),
-        )
-    else:
-        cursor.execute(
-            """
-            SELECT DISTINCT substr(start_time, 1, 10) as dt
-            FROM transmissions
-            ORDER BY dt ASC
-            """
-        )
+    cursor.execute("SELECT start_time FROM transmissions ORDER BY start_time ASC")
     rows = cursor.fetchall()
-    return [r["dt"] for r in rows if r["dt"]]
+    dates_set = set()
+    for r in rows:
+        try:
+            dt = _parse_datetime(r["start_time"]).astimezone(active_tz)
+            dt_str = dt.strftime("%Y-%m-%d")
+            if month:
+                if dt_str.startswith(month):
+                    dates_set.add(dt_str)
+            else:
+                dates_set.add(dt_str)
+        except Exception:
+            continue
+    return sorted(list(dates_set))
 
 
 @router.get("", response_model=List[TransmissionModel])
@@ -114,13 +117,21 @@ def list_recordings(
     offset: int = Query(0, ge=0),
     db: sqlite3.Connection = Depends(get_db),
 ) -> List[TransmissionModel]:
-    """Paginated list of transmissions with filtering by date, frequency, and starred status."""
+    """Paginated list of transmissions with filtering by date, frequency, and starred status in server timezone."""
+    active_tz = get_server_timezone_from_db(db)
     conditions = []
     params: List[Any] = []
 
     if date:
-        conditions.append("substr(start_time, 1, 10) = ?")
-        params.append(date)
+        try:
+            dt_day = datetime.strptime(date, "%Y-%m-%d").replace(tzinfo=active_tz)
+            prev_d = (dt_day - timedelta(days=1)).strftime("%Y-%m-%d")
+            next_d = (dt_day + timedelta(days=1)).strftime("%Y-%m-%d")
+            conditions.append("substr(start_time, 1, 10) IN (?, ?, ?)")
+            params.extend([prev_d, date, next_d])
+        except Exception:
+            conditions.append("substr(start_time, 1, 10) = ?")
+            params.append(date)
 
     if frequency is not None:
         conditions.append("frequency_hz = ?")
@@ -133,18 +144,29 @@ def list_recordings(
     where_sql = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
     cursor = db.cursor()
-    # Total count for pagination headers
-    cursor.execute(f"SELECT COUNT(*) as cnt FROM transmissions {where_sql}", tuple(params))
-    total_count = cursor.fetchone()["cnt"]
-    response.headers["X-Total-Count"] = str(total_count)
-
-    # Paginated rows
-    query_sql = f"SELECT * FROM transmissions {where_sql} ORDER BY start_time DESC LIMIT ? OFFSET ?"
-    query_params = tuple(params + [limit, offset])
-    cursor.execute(query_sql, query_params)
+    query_sql = f"SELECT * FROM transmissions {where_sql} ORDER BY start_time DESC"
+    cursor.execute(query_sql, tuple(params))
     rows = cursor.fetchall()
 
-    return [TransmissionModel.model_validate(dict(r)) for r in rows]
+    filtered_rows = []
+    for r in rows:
+        row_dict = dict(r)
+        try:
+            dt_start = _parse_datetime(row_dict["start_time"]).astimezone(active_tz)
+            if date and dt_start.strftime("%Y-%m-%d") != date:
+                continue
+            row_dict["start_time"] = dt_start.isoformat()
+            if row_dict.get("end_time"):
+                row_dict["end_time"] = _parse_datetime(row_dict["end_time"]).astimezone(active_tz).isoformat()
+        except Exception:
+            pass
+        filtered_rows.append(row_dict)
+
+    total_count = len(filtered_rows)
+    response.headers["X-Total-Count"] = str(total_count)
+    paged = filtered_rows[offset : offset + limit]
+
+    return [TransmissionModel.model_validate(dict(item)) for item in paged]
 
 
 @router.get("/{id}/audio")

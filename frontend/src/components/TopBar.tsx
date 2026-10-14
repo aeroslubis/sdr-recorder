@@ -5,6 +5,7 @@ import {
   ChevronDown,
   LogOut,
   Sliders,
+  Clock,
 } from 'lucide-react';
 import { SettingsTab } from './SettingsModal';
 
@@ -16,6 +17,8 @@ export interface TopBarProps {
   diskUsedGB?: number;
   diskTotalGB?: number;
   username?: string;
+  serverTime?: string;
+  serverTimezone?: string;
   onOpenSettings?: (tab: SettingsTab) => void;
   onOpenDongleConfig?: () => void;
   onOpenStorageManager?: () => void;
@@ -32,6 +35,8 @@ export const TopBar: React.FC<TopBarProps> = ({
   diskUsedGB = 14.8,
   diskTotalGB = 100,
   username = 'admin',
+  serverTime,
+  serverTimezone,
   onOpenSettings,
   onOpenDongleConfig,
   onOpenStorageManager,
@@ -96,6 +101,18 @@ export const TopBar: React.FC<TopBarProps> = ({
             {hardwareConnected ? 'RTL-SDR ONLINE' : 'NO SDR DEVICE'}
           </span>
         </div>
+
+        {/* Server Clock Pill */}
+        {serverTime && (
+          <div
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1 bg-ash border border-charcoal rounded-pill text-xs font-mono text-silver-mist"
+            title={`Server Clock (${serverTimezone || 'Server Timezone'})`}
+          >
+            <Clock className="w-3.5 h-3.5 text-phosphor-green" />
+            <span className="text-snow">{serverTime}</span>
+            {serverTimezone && <span className="text-smoke text-[10px]">{serverTimezone}</span>}
+          </div>
+        )}
 
         {/* Storage Quota Indicator */}
         <div className="hidden md:flex flex-col gap-1 w-44">

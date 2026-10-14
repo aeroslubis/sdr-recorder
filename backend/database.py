@@ -67,7 +67,13 @@ CREATE TABLE IF NOT EXISTS system_settings (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     retention_days INTEGER NOT NULL DEFAULT 14,
     max_disk_usage_percent INTEGER NOT NULL DEFAULT 90,
-    audio_format TEXT NOT NULL DEFAULT 'opus'
+    audio_format TEXT NOT NULL DEFAULT 'opus',
+    min_speech_duration_ms INTEGER NOT NULL DEFAULT 300,
+    pre_roll_ms INTEGER NOT NULL DEFAULT 500,
+    hang_time_ms INTEGER NOT NULL DEFAULT 1000,
+    max_transmission_sec INTEGER NOT NULL DEFAULT 300,
+    enable_squelch_tail_suppression INTEGER NOT NULL DEFAULT 1,
+    server_timezone TEXT NOT NULL DEFAULT 'auto'
 );
 """
 
@@ -127,14 +133,31 @@ def init_db(db_path: Optional[str] = None) -> None:
                 ),
             )
 
+        # Safe schema migration for system_settings columns
+        cursor.execute("PRAGMA table_info(system_settings)")
+        existing_cols = {row["name"] for row in cursor.fetchall()}
+        col_defaults = {
+            "min_speech_duration_ms": "INTEGER NOT NULL DEFAULT 300",
+            "pre_roll_ms": "INTEGER NOT NULL DEFAULT 500",
+            "hang_time_ms": "INTEGER NOT NULL DEFAULT 1000",
+            "max_transmission_sec": "INTEGER NOT NULL DEFAULT 300",
+            "enable_squelch_tail_suppression": "INTEGER NOT NULL DEFAULT 1",
+            "server_timezone": "TEXT NOT NULL DEFAULT 'auto'",
+        }
+        for col_name, col_def in col_defaults.items():
+            if col_name not in existing_cols:
+                cursor.execute(f"ALTER TABLE system_settings ADD COLUMN {col_name} {col_def}")
+
         # Seed default system_settings if not exists
         cursor.execute("SELECT id FROM system_settings WHERE id = 1")
         if cursor.fetchone() is None:
             cursor.execute(
                 """
                 INSERT INTO system_settings (
-                    id, retention_days, max_disk_usage_percent, audio_format
-                ) VALUES (1, ?, ?, ?)
+                    id, retention_days, max_disk_usage_percent, audio_format,
+                    min_speech_duration_ms, pre_roll_ms, hang_time_ms,
+                    max_transmission_sec, enable_squelch_tail_suppression, server_timezone
+                ) VALUES (1, ?, ?, ?, 300, 500, 1000, 300, 1, 'auto')
                 """,
                 (
                     config.DEFAULT_RETENTION_DAYS,

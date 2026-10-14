@@ -222,6 +222,7 @@ def test_recordings_api_endpoints(api_client):
     client, db_path, tmp_path = api_client
     conn = get_connection(db_path)
     cur = conn.cursor()
+    cur.execute("UPDATE system_settings SET server_timezone = 'UTC' WHERE id = 1")
 
     rec_dir = tmp_path / "storage" / "recordings" / "2026-10-13"
     rec_dir.mkdir(parents=True, exist_ok=True)
@@ -256,12 +257,11 @@ def test_recordings_api_endpoints(api_client):
     dates = resp.json()
     assert "2026-10-13" in dates
 
-    # 2. Timeline intervals
+    # 2. Timeline intervals (UTC: 10:00:00 is 10 * 3600 * 1000 = 36000000 ms)
     resp = client.get("/api/recordings/timeline?date=2026-10-13")
     assert resp.status_code == 200
     timeline = resp.json()
     assert len(timeline) == 2
-    # 10:00:00 is 10 * 3600 * 1000 = 36000000 ms
     item1 = next(t for t in timeline if t["id"] == rec1_id)
     assert item1["start_ms"] == 36000000
     assert item1["end_ms"] == 36002000

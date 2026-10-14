@@ -11,16 +11,27 @@ import {
   Trash2,
   Edit2,
   Save,
+  Mic,
+  Clock,
 } from 'lucide-react';
 import { PresetItem } from './RadioTuningPanel';
 import { DongleHardwareConfig, R820T_GAIN_STEPS } from './DongleConfigModal';
 
-export type SettingsTab = 'dongle' | 'channels' | 'storage' | 'password';
+export type SettingsTab = 'dongle' | 'channels' | 'recording' | 'storage' | 'password';
 
 export interface StorageSettings {
   retention_days: number;
   max_disk_usage_percent: number;
   audio_format: string;
+}
+
+export interface RecordingSettings {
+  min_speech_duration_ms: number;
+  pre_roll_ms: number;
+  hang_time_ms: number;
+  max_transmission_sec: number;
+  enable_squelch_tail_suppression: boolean;
+  server_timezone: string;
 }
 
 export interface DeviceItem {
@@ -56,6 +67,7 @@ export interface SettingsModalProps {
   onClose: () => void;
   onSaveDongle: (config: DongleHardwareConfig) => Promise<void> | void;
   onSaveStorage: (settings: StorageSettings) => Promise<void> | void;
+  onSaveRecording?: (settings: RecordingSettings) => Promise<void> | void;
   onChangePassword: (passwords: {
     old_password: string;
     new_password: string;
@@ -65,6 +77,7 @@ export interface SettingsModalProps {
   onDeletePreset?: (presetId: number) => void;
   initialDongleConfig?: DongleHardwareConfig;
   initialStorageSettings?: StorageSettings;
+  initialRecordingSettings?: Partial<RecordingSettings>;
   diskUsedGB?: number;
   diskTotalGB?: number;
   className?: string;
@@ -76,12 +89,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose,
   onSaveDongle,
   onSaveStorage,
+  onSaveRecording,
   onChangePassword,
   presets = [],
   onSavePreset,
   onDeletePreset,
   initialDongleConfig,
   initialStorageSettings,
+  initialRecordingSettings,
   diskUsedGB = 14.8,
   diskTotalGB = 100.0,
   className = '',
@@ -166,6 +181,102 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     category: 'Airband',
     squelch_threshold: -42.0,
   });
+
+  // Tab: Recording Settings State
+  const [recordingSettings, setRecordingSettings] = useState<RecordingSettings>({
+    min_speech_duration_ms: initialRecordingSettings?.min_speech_duration_ms ?? 300,
+    pre_roll_ms: initialRecordingSettings?.pre_roll_ms ?? 500,
+    hang_time_ms: initialRecordingSettings?.hang_time_ms ?? 1000,
+    max_transmission_sec: initialRecordingSettings?.max_transmission_sec ?? 300,
+    enable_squelch_tail_suppression: initialRecordingSettings?.enable_squelch_tail_suppression ?? true,
+    server_timezone: initialRecordingSettings?.server_timezone ?? 'auto',
+  });
+  const [recordingSaving, setRecordingSaving] = useState(false);
+  const [recordingSaved, setRecordingSaved] = useState(false);
+  const [serverTimeData, setServerTimeData] = useState<{
+    timezone: string;
+    configured_timezone: string;
+    tz_abbreviation: string;
+    server_time_formatted: string;
+    utc_offset_str: string;
+    supported_timezones: string[];
+  } | null>(null);
+
+  const fetchServerSettingsAndTime = () => {
+    let token: string | null = null;
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        token = window.localStorage.getItem('sdr_auth_token');
+      }
+    } catch {}
+    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+
+    fetch('/api/system/time', { headers })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setServerTimeData(data);
+      })
+      .catch(() => {});
+
+    fetch('/api/system/settings', { headers })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) {
+          setRecordingSettings((prev) => ({
+            ...prev,
+            min_speech_duration_ms: data.min_speech_duration_ms ?? prev.min_speech_duration_ms,
+            pre_roll_ms: data.pre_roll_ms ?? prev.pre_roll_ms,
+            hang_time_ms: data.hang_time_ms ?? prev.hang_time_ms,
+            max_transmission_sec: data.max_transmission_sec ?? prev.max_transmission_sec,
+            enable_squelch_tail_suppression: data.enable_squelch_tail_suppression !== undefined
+              ? Boolean(data.enable_squelch_tail_suppression)
+              : prev.enable_squelch_tail_suppression,
+            server_timezone: data.server_timezone || prev.server_timezone,
+          }));
+        }
+      })
+      .catch(() => {});
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchServerSettingsAndTime();
+    }
+  }, [isOpen, activeTab]);
+
+  const handleSaveRecordingSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setRecordingSaving(true);
+    try {
+      if (onSaveRecording) {
+        await onSaveRecording(recordingSettings);
+      } else {
+        let token: string | null = null;
+        try {
+          if (typeof window !== 'undefined' && window.localStorage) {
+            token = window.localStorage.getItem('sdr_auth_token');
+          }
+        } catch {}
+        const headers: HeadersInit = {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        };
+        await fetch('/api/system/settings', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            ...recordingSettings,
+            enable_squelch_tail_suppression: recordingSettings.enable_squelch_tail_suppression ? 1 : 0,
+          }),
+        });
+      }
+      setRecordingSaved(true);
+      setTimeout(() => setRecordingSaved(false), 2500);
+      fetchServerSettingsAndTime();
+    } finally {
+      setRecordingSaving(false);
+    }
+  };
 
   // Tab 3: Storage Settings State
   const [storageSettings, setStorageSettings] = useState<StorageSettings>({
@@ -384,6 +495,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           >
             <Radio className="w-3.5 h-3.5" />
             <span>Channel Setup</span>
+          </button>
+
+          <button
+            role="tab"
+            aria-selected={activeTab === 'recording'}
+            onClick={() => setActiveTab('recording')}
+            className={`flex items-center gap-2 py-3 px-4 border-b-2 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${
+              activeTab === 'recording'
+                ? 'border-phosphor-green text-phosphor-green'
+                : 'border-transparent text-silver-mist hover:text-snow'
+            }`}
+          >
+            <Mic className="w-3.5 h-3.5" />
+            <span>Recording Setup</span>
           </button>
 
           <button
@@ -977,6 +1102,239 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </table>
               </div>
             </div>
+          )}
+
+          {/* TAB: RECORDING SETUP */}
+          {activeTab === 'recording' && (
+            <form onSubmit={handleSaveRecordingSubmit} className="space-y-5">
+              {/* Server Time & Timezone Status Card */}
+              <div className="bg-ash border border-charcoal rounded-cards p-4 space-y-2 font-mono">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-silver-mist flex items-center gap-1.5 font-sans font-medium">
+                    <Clock className="w-3.5 h-3.5 text-phosphor-green" />
+                    <span>Host / Server Time</span>
+                  </span>
+                  <span className="text-phosphor-green font-semibold">
+                    {serverTimeData?.server_time_formatted || 'Synchronizing...'} {serverTimeData?.tz_abbreviation || ''}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-smoke">
+                  <span>Active Timezone: {serverTimeData?.timezone || 'Auto-detecting'}</span>
+                  <span>Offset: {serverTimeData?.utc_offset_str || 'UTC'}</span>
+                </div>
+              </div>
+
+              {/* Server Timezone Selection */}
+              <div>
+                <label htmlFor="server-timezone" className="block text-xs font-medium text-silver-mist mb-1.5">
+                  Server Timezone
+                </label>
+                <select
+                  id="server-timezone"
+                  value={recordingSettings.server_timezone}
+                  onChange={(e) =>
+                    setRecordingSettings({ ...recordingSettings, server_timezone: e.target.value })
+                  }
+                  className="w-full bg-ash border border-slate focus:border-phosphor-green rounded-inputs px-3 py-2 text-xs text-snow outline-none font-mono"
+                >
+                  <option value="auto">auto (Auto-detect host system: {serverTimeData?.timezone || 'Host OS'})</option>
+                  <option value="Asia/Jayapura">Asia/Jayapura (WIT · UTC+09:00 · Papua, Maluku)</option>
+                  <option value="Asia/Makassar">Asia/Makassar (WITA · UTC+08:00 · Bali, Sulawesi)</option>
+                  <option value="Asia/Jakarta">Asia/Jakarta (WIB · UTC+07:00 · Jawa, Sumatera)</option>
+                  <option value="UTC">UTC (Coordinated Universal Time)</option>
+                  <option value="Asia/Singapore">Asia/Singapore (SGT · UTC+08:00)</option>
+                  <option value="Asia/Bangkok">Asia/Bangkok (ICT · UTC+07:00)</option>
+                  <option value="Asia/Tokyo">Asia/Tokyo (JST · UTC+09:00)</option>
+                  <option value="Australia/Sydney">Australia/Sydney (AEST · UTC+10:00)</option>
+                  <option value="Europe/London">Europe/London (GMT/BST)</option>
+                  <option value="America/New_York">America/New_York (EST/EDT)</option>
+                </select>
+                <p className="text-[11px] text-smoke mt-1 font-mono">
+                  All recording folders (YYYY-MM-DD), timeline scrubber hours, and call logs will align with this timezone.
+                </p>
+              </div>
+
+              {/* Minimum Speech Duration */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label htmlFor="min-speech-duration" className="text-xs font-medium text-silver-mist">
+                    Minimum Speech Duration
+                  </label>
+                  <span className="text-xs font-mono text-phosphor-green font-semibold">
+                    {recordingSettings.min_speech_duration_ms} ms ({ (recordingSettings.min_speech_duration_ms / 1000).toFixed(2) }s)
+                  </span>
+                </div>
+                {/* Quick Preset Buttons */}
+                <div className="flex items-center gap-2 mb-2">
+                  {[150, 200, 300, 500, 1000].map((ms) => (
+                    <button
+                      key={ms}
+                      type="button"
+                      onClick={() =>
+                        setRecordingSettings({ ...recordingSettings, min_speech_duration_ms: ms })
+                      }
+                      className={`px-2.5 py-1 rounded text-[11px] font-mono transition-colors cursor-pointer border ${
+                        recordingSettings.min_speech_duration_ms === ms
+                          ? 'bg-phosphor-green/20 border-phosphor-green text-phosphor-green font-medium'
+                          : 'bg-ash border-charcoal text-silver-mist hover:text-snow'
+                      }`}
+                    >
+                      {ms}ms {ms === 200 ? '(Recommended)' : ''}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  id="min-speech-duration"
+                  type="range"
+                  min="50"
+                  max="2000"
+                  step="50"
+                  value={recordingSettings.min_speech_duration_ms}
+                  onChange={(e) =>
+                    setRecordingSettings({
+                      ...recordingSettings,
+                      min_speech_duration_ms: parseInt(e.target.value, 10),
+                    })
+                  }
+                  className="w-full accent-phosphor-green cursor-pointer"
+                />
+                <p className="text-[11px] text-smoke mt-1 font-mono">
+                  Audio bursts shorter than this threshold will be discarded as noise pops or false squelch clicks.
+                </p>
+              </div>
+
+              {/* Squelch Tail Suppression */}
+              <div className="bg-ash border border-charcoal rounded-cards p-3.5 flex items-start gap-3">
+                <input
+                  id="squelch-tail-suppress"
+                  type="checkbox"
+                  checked={recordingSettings.enable_squelch_tail_suppression}
+                  onChange={(e) =>
+                    setRecordingSettings({
+                      ...recordingSettings,
+                      enable_squelch_tail_suppression: e.target.checked,
+                    })
+                  }
+                  className="mt-0.5 accent-phosphor-green cursor-pointer w-4 h-4 rounded"
+                />
+                <div>
+                  <label htmlFor="squelch-tail-suppress" className="text-xs font-medium text-snow cursor-pointer block">
+                    Enable Squelch Tail & Pop Suppression
+                  </label>
+                  <p className="text-[11px] text-smoke mt-0.5 font-mono">
+                    Filters out sudden squelch hiss bursts and PTT unkey click pops when speech stops.
+                  </p>
+                </div>
+              </div>
+
+              {/* Pre-Roll Buffer */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label htmlFor="rec-pre-roll" className="text-xs font-medium text-silver-mist">
+                    Pre-Roll Ring Buffer
+                  </label>
+                  <span className="text-xs font-mono text-phosphor-green font-semibold">
+                    {recordingSettings.pre_roll_ms} ms
+                  </span>
+                </div>
+                <input
+                  id="rec-pre-roll"
+                  type="range"
+                  min="100"
+                  max="2000"
+                  step="50"
+                  value={recordingSettings.pre_roll_ms}
+                  onChange={(e) =>
+                    setRecordingSettings({
+                      ...recordingSettings,
+                      pre_roll_ms: parseInt(e.target.value, 10),
+                    })
+                  }
+                  className="w-full accent-phosphor-green cursor-pointer"
+                />
+                <p className="text-[11px] text-smoke mt-1 font-mono">
+                  Audio continuously kept in circular memory prior to squelch opening to prevent initial syllable cutoff.
+                </p>
+              </div>
+
+              {/* Hang Time */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label htmlFor="rec-hang-time" className="text-xs font-medium text-silver-mist">
+                    Hang Time (Silence Delay)
+                  </label>
+                  <span className="text-xs font-mono text-phosphor-green font-semibold">
+                    {recordingSettings.hang_time_ms} ms
+                  </span>
+                </div>
+                <input
+                  id="rec-hang-time"
+                  type="range"
+                  min="200"
+                  max="3000"
+                  step="100"
+                  value={recordingSettings.hang_time_ms}
+                  onChange={(e) =>
+                    setRecordingSettings({
+                      ...recordingSettings,
+                      hang_time_ms: parseInt(e.target.value, 10),
+                    })
+                  }
+                  className="w-full accent-phosphor-green cursor-pointer"
+                />
+                <p className="text-[11px] text-smoke mt-1 font-mono">
+                  Duration to keep recording after signal drops below squelch so natural speech pauses do not split calls.
+                </p>
+              </div>
+
+              {/* Max Transmission Duration */}
+              <div>
+                <label htmlFor="max-transmission" className="block text-xs font-medium text-silver-mist mb-1.5">
+                  Maximum Transmission Duration
+                </label>
+                <select
+                  id="max-transmission"
+                  value={recordingSettings.max_transmission_sec}
+                  onChange={(e) =>
+                    setRecordingSettings({
+                      ...recordingSettings,
+                      max_transmission_sec: parseInt(e.target.value, 10),
+                    })
+                  }
+                  className="w-full bg-ash border border-slate focus:border-phosphor-green rounded-inputs px-3 py-2 text-xs text-snow outline-none font-mono"
+                >
+                  <option value={30}>30 Seconds</option>
+                  <option value={60}>1 Minute (60s)</option>
+                  <option value={120}>2 Minutes (120s)</option>
+                  <option value={300}>5 Minutes (300s - Default)</option>
+                  <option value={600}>10 Minutes (600s)</option>
+                  <option value={1800}>30 Minutes (1800s)</option>
+                </select>
+                <p className="text-[11px] text-smoke mt-1 font-mono">
+                  Caps continuous recordings into individual files if carrier lock occurs or a channel is stuck.
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center justify-between pt-3 border-t border-charcoal">
+                {recordingSaved && (
+                  <span className="text-xs text-phosphor-green flex items-center gap-1.5 font-mono">
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Recording settings saved and applied to receiver.</span>
+                  </span>
+                )}
+                {!recordingSaved && <span />}
+
+                <button
+                  type="submit"
+                  disabled={recordingSaving}
+                  className="flex items-center gap-2 px-4 py-2 bg-phosphor-green text-obsidian font-medium rounded-pill hover:bg-mint-pulse transition-colors text-xs cursor-pointer ml-auto"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>{recordingSaving ? 'Saving...' : 'Save Recording Setup'}</span>
+                </button>
+              </div>
+            </form>
           )}
 
           {/* TAB 3: STORAGE */}
