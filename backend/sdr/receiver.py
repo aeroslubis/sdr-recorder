@@ -199,13 +199,26 @@ class SDRReceiver:
         else:
             mod_arg = "am"
 
+        # Determine squelch parameter for rtl_fm:
+        # In FM mode, discriminator noise without squelch is ~9000 RMS (-11 dBFS).
+        # We map squelch_threshold (-100 to 0 dBFS) to rtl_fm -l level.
+        if mod_arg in ["fm", "wbfm"]:
+            if self.config.squelch_threshold <= -95.0:
+                squelch_l = "0"
+            else:
+                # Maps -90..0 dBFS to rtl_fm squelch level (e.g. -50 dBFS -> 70, -42 dBFS -> 81)
+                l_val = max(1, min(300, int((self.config.squelch_threshold + 100.0) * 1.4)))
+                squelch_l = str(l_val)
+        else:
+            squelch_l = "0"
+
         cmd = [
             "rtl_fm",
             "-f", str(self.config.frequency_hz),
             "-M", mod_arg,
             "-s", "24k",
             "-d", str(self.config.device_index),
-            "-l", "0",  # Disable rtl_fm internal squelch so our software DSP handles it
+            "-l", squelch_l,
         ]
 
         if self.config.gain_mode == "manual":
@@ -225,6 +238,33 @@ class SDRReceiver:
         # Output to stdout
         cmd.append("-")
         return cmd
+
+    async def _read_hardware_chunk(self) -> bytes:
+        """Reads exactly self.chunk_bytes from rtl_fm stdout, or returns silence on squelch timeout."""
+        if not self._process or not self._process.stdout:
+            return b"\x00" * self.chunk_bytes
+
+        buf = bytearray()
+        while len(buf) < self.chunk_bytes:
+            needed = self.chunk_bytes - len(buf)
+            try:
+                part = await asyncio.wait_for(
+                    self._process.stdout.read(needed),
+                    timeout=0.08,
+                )
+                if not part:
+                    # EOF from subprocess
+                    break
+                buf.extend(part)
+            except asyncio.TimeoutError:
+                # No data from rtl_fm within 80ms (squelch is active)
+                break
+
+        if len(buf) == 0:
+            return b"\x00" * self.chunk_bytes
+        if len(buf) < self.chunk_bytes:
+            buf.extend(b"\x00" * (self.chunk_bytes - len(buf)))
+        return bytes(buf)
 
     async def _safe_call(self, callback: Optional[Callable], *args) -> None:
         """Safely invokes an async or sync callback with flexible signature matching."""
@@ -313,7 +353,7 @@ class SDRReceiver:
                     chunk = await self.simulator.read_chunk()
                 else:
                     assert self._process is not None
-                    chunk = await self._process.stdout.readexactly(self.chunk_bytes)
+                    chunk = await self._read_hardware_chunk()
 
                 if not chunk:
                     break

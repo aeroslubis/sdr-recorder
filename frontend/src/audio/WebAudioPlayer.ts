@@ -178,6 +178,92 @@ export class WebAudioPlayer {
     }
   }
 
+  /**
+   * Resumes or initializes the Web Audio context (e.g. following user gesture).
+   */
+  public async resumeContext(): Promise<void> {
+    if (!this.audioContext) {
+      this.initAudioContext();
+    }
+    if (this.audioContext && this.audioContext.state === 'suspended') {
+      try {
+        await this.audioContext.resume();
+      } catch (err) {
+        // Autoplay policy fallback
+      }
+    }
+  }
+
+  private nextPlayTime: number = 0;
+
+  /**
+   * Plays live PCM 16-bit signed audio chunks (mono, 24000 Hz) with low latency scheduling.
+   */
+  public playPcmChunk(pcmData: ArrayBuffer | Uint8Array, sampleRate: number = 24000): void {
+    if (!this.audioContext) {
+      this.initAudioContext();
+    }
+    if (!this.audioContext) return;
+
+    if (this.audioContext.state === 'suspended') {
+      this.audioContext.resume().catch(() => {});
+    }
+
+    const byteLen = pcmData.byteLength;
+    if (byteLen < 2) return;
+
+    const numSamples = Math.floor(byteLen / 2);
+    const int16 = new Int16Array(
+      pcmData instanceof ArrayBuffer ? pcmData : pcmData.buffer,
+      pcmData instanceof ArrayBuffer ? 0 : pcmData.byteOffset,
+      numSamples
+    );
+
+    let buffer: AudioBuffer;
+    try {
+      buffer = this.audioContext.createBuffer(1, numSamples, sampleRate);
+    } catch {
+      return;
+    }
+
+    const channel = buffer.getChannelData(0);
+    for (let i = 0; i < numSamples; i++) {
+      channel[i] = int16[i] / 32768.0;
+    }
+
+    let source: AudioBufferSourceNode;
+    try {
+      source = this.audioContext.createBufferSource();
+      source.buffer = buffer;
+    } catch {
+      return;
+    }
+
+    try {
+      if (this.dspFilterEnabled && this.filterNode && this.gainNode) {
+        source.connect(this.filterNode);
+      } else if (this.gainNode) {
+        source.connect(this.gainNode);
+      } else {
+        source.connect(this.audioContext.destination);
+      }
+    } catch {
+      // Connect fallback
+    }
+
+    const now = this.audioContext.currentTime;
+    if (this.nextPlayTime < now) {
+      this.nextPlayTime = now + 0.02;
+    }
+
+    try {
+      source.start(this.nextPlayTime);
+      this.nextPlayTime += buffer.duration;
+    } catch {
+      // ignore
+    }
+  }
+
   public setVolume(volume: number): void {
     const clamped = Math.max(0, Math.min(1, volume));
     this.volume = clamped;

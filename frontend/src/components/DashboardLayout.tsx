@@ -10,7 +10,7 @@ import { LiveSpectrumVisualizer } from './LiveSpectrumVisualizer';
 import { DongleHardwareConfig } from './DongleConfigModal';
 import { WebAudioPlayer } from '../audio/WebAudioPlayer';
 import { formatDate } from './HistoryDatePicker';
-import { Volume2, VolumeX, Filter } from 'lucide-react';
+import { Volume2, VolumeX, Filter, Radio } from 'lucide-react';
 
 export interface DashboardLayoutProps {
   className?: string;
@@ -32,11 +32,17 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
   const [isSimulator, setIsSimulator] = useState<boolean>(true);
   const [presets, setPresets] = useState<PresetItem[]>([]);
 
-  // Live WebSocket Telemetry
+  // Live WebSocket Telemetry & Audio Streaming
   const [liveRssi, setLiveRssi] = useState<number>(-75.0);
   const [squelchOpen, setSquelchOpen] = useState<boolean>(false);
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [liveUnsquelched, setLiveUnsquelched] = useState<boolean>(false);
+  const [isLiveListening, setIsLiveListening] = useState<boolean>(true);
+  const isLiveListeningRef = useRef<boolean>(true);
+
+  useEffect(() => {
+    isLiveListeningRef.current = isLiveListening;
+  }, [isLiveListening]);
 
   // Archive & Timeline state
   const [timelineTransmissions, setTimelineTransmissions] = useState<TransmissionInterval[]>([]);
@@ -182,6 +188,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
 
     try {
       socket = new WebSocket(wsUrl);
+      socket.binaryType = 'arraybuffer';
       wsRef.current = socket;
 
       socket.onopen = () => {
@@ -202,6 +209,10 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
               if (msg.modulation !== undefined) setModulation(msg.modulation);
             }
           } catch {}
+        } else if (event.data instanceof ArrayBuffer) {
+          if (isLiveListeningRef.current && audioPlayerRef.current) {
+            audioPlayerRef.current.playPcmChunk(event.data, 24000);
+          }
         }
       };
 
@@ -373,10 +384,23 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
     document.body.removeChild(a);
   };
 
+  // Live Speaker Audio Toggle
+  const handleToggleLiveListening = async () => {
+    const next = !isLiveListening;
+    setIsLiveListening(next);
+    isLiveListeningRef.current = next;
+    if (next && audioPlayerRef.current) {
+      await audioPlayerRef.current.resumeContext();
+    }
+  };
+
   // Live Unsquelch Monitor toggle
-  const handleToggleLiveMonitor = () => {
+  const handleToggleLiveMonitor = async () => {
     const nextState = !liveUnsquelched;
     setLiveUnsquelched(nextState);
+    if (nextState && audioPlayerRef.current) {
+      await audioPlayerRef.current.resumeContext();
+    }
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'listen', unsquelched: nextState }));
     }
@@ -505,24 +529,40 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
                 <span>DSP Filter {dspFilterActive ? 'ON' : 'OFF'}</span>
               </button>
 
-              {/* Unsquelch Live Monitor Button */}
+              {/* Live Speaker Audio Toggle */}
+              <button
+                type="button"
+                onClick={handleToggleLiveListening}
+                aria-label="Live Speaker Audio"
+                title={isLiveListening ? 'Mute Live Audio' : 'Unmute Live Audio'}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-pill border text-xs font-mono transition-colors cursor-pointer ${
+                  isLiveListening
+                    ? 'bg-phosphor-green/20 border-phosphor-green text-phosphor-green font-medium'
+                    : 'bg-obsidian border-charcoal hover:border-slate text-smoke hover:text-snow'
+                }`}
+              >
+                {isLiveListening ? (
+                  <Volume2 className="w-3.5 h-3.5 text-phosphor-green" />
+                ) : (
+                  <VolumeX className="w-3.5 h-3.5 text-smoke" />
+                )}
+                <span>{isLiveListening ? 'SPEAKER LIVE: ON' : 'SPEAKER: MUTED'}</span>
+              </button>
+
+              {/* Squelch Bypass Button */}
               <button
                 type="button"
                 onClick={handleToggleLiveMonitor}
-                aria-label="Live Monitor Unmute"
-                title={liveUnsquelched ? 'Restore Squelch Mute' : 'Bypass Squelch to Listen Live'}
+                aria-label="Live Squelch Bypass"
+                title={liveUnsquelched ? 'Restore Automatic Squelch' : 'Bypass Squelch to Listen Continuously'}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-pill border text-xs font-mono transition-colors cursor-pointer ${
                   liveUnsquelched
                     ? 'bg-amber-400/20 border-amber-400 text-amber-300 font-medium'
                     : 'bg-obsidian border-charcoal hover:border-slate text-silver-mist hover:text-snow'
                 }`}
               >
-                {liveUnsquelched ? (
-                  <Volume2 className="w-3.5 h-3.5 text-amber-400" />
-                ) : (
-                  <VolumeX className="w-3.5 h-3.5 text-smoke" />
-                )}
-                <span>{liveUnsquelched ? 'Unsquelched' : 'Squelched'}</span>
+                <Radio className="w-3.5 h-3.5" />
+                <span>{liveUnsquelched ? 'Squelch BYPASS' : 'Squelch AUTO'}</span>
               </button>
             </div>
           </div>
