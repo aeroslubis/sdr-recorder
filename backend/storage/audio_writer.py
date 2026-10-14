@@ -61,6 +61,7 @@ def save_transmission(
             "ffmpeg",
             "-y",
             "-i", str(wav_file),
+            "-af", "highpass=f=250,lowpass=f=3500",
             "-c:a", "libopus" if ext in ["opus", "ogg"] else "libmp3lame",
             "-b:a", "24k",
             str(converted_file),

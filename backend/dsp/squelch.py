@@ -52,6 +52,9 @@ def calculate_rssi_dbfs(pcm_chunk: Union[bytes, bytearray, np.ndarray]) -> float
     if len(samples) == 0:
         return -100.0
 
+    # Strip DC offset so DC carrier bias does not falsely inflate audio RSSI
+    samples = samples - np.mean(samples)
+
     mean_sq = np.mean(samples ** 2)
     if mean_sq <= 1e-12:
         return -100.0

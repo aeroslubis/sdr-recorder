@@ -280,6 +280,7 @@ class SDRReceiver:
             "-s", "24k",
             "-d", str(self.config.device_index),
             "-l", squelch_l,
+            "-E", "dc",
         ]
 
         if self.config.gain_mode == "manual":
@@ -310,22 +311,41 @@ class SDRReceiver:
                 self._is_hardware_connected = False
             return b"\x00" * self.chunk_bytes
 
+        # If rtl_fm is in continuous streaming mode (AM/USB/LSB or squelch disabled <= -95 dBFS)
+        is_continuous = (self.config.modulation.lower() in ["am", "usb", "lsb", "raw"]) or (self.config.squelch_threshold <= -95.0)
+
+        if is_continuous:
+            try:
+                chunk = await asyncio.wait_for(
+                    self._process.stdout.readexactly(self.chunk_bytes),
+                    timeout=1.5,
+                )
+                return chunk
+            except asyncio.IncompleteReadError:
+                if not is_hardware_available(self.config.device_index):
+                    self._is_hardware_connected = False
+                return b"\x00" * self.chunk_bytes
+            except asyncio.TimeoutError:
+                return b"\x00" * self.chunk_bytes
+
+        # For gated hardware squelch mode (FM with -l > 0)
         buf = bytearray()
         while len(buf) < self.chunk_bytes:
             needed = self.chunk_bytes - len(buf)
             try:
+                # If no audio has arrived yet, wait up to 80ms for squelch gate to open
+                # Once audio has started (len(buf) > 0), give up to 500ms to avoid audio tearing
+                read_timeout = 0.08 if len(buf) == 0 else 0.50
                 part = await asyncio.wait_for(
                     self._process.stdout.read(needed),
-                    timeout=0.08,
+                    timeout=read_timeout,
                 )
                 if not part:
-                    # EOF from subprocess (dongle unplugged or process died)
                     if not is_hardware_available(self.config.device_index):
                         self._is_hardware_connected = False
                     break
                 buf.extend(part)
             except asyncio.TimeoutError:
-                # No data from rtl_fm within 80ms (squelch is active)
                 break
 
         if len(buf) == 0:

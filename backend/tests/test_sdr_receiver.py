@@ -116,6 +116,7 @@ def test_build_rtl_fm_command():
     assert "5" in cmd
     assert "-T" in cmd
     assert "-E" in cmd
+    assert "dc" in cmd
     assert "direct" in cmd
 
 
