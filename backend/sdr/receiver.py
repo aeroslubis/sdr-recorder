@@ -90,7 +90,7 @@ def probe_squelch_level(freq_hz: int, mod: str = "fm", device_index: int = 0) ->
     low = 20
     high = 800
     best = 400
-    for _ in range(5):
+    for _ in range(6):
         mid = (low + high) // 2
         cmd = [
             "rtl_fm",
@@ -103,8 +103,8 @@ def probe_squelch_level(freq_hz: int, mod: str = "fm", device_index: int = 0) ->
         ]
         try:
             p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-            time.sleep(0.35)
-            r, _, _ = select.select([p.stdout], [], [], 0.25)
+            time.sleep(0.70)
+            r, _, _ = select.select([p.stdout], [], [], 0.35)
             p.terminate()
             p.wait(timeout=0.5)
             if r:
@@ -114,7 +114,7 @@ def probe_squelch_level(freq_hz: int, mod: str = "fm", device_index: int = 0) ->
                 high = mid - 1
         except Exception:
             pass
-    return max(10, min(1000, best + 25))
+    return max(10, min(1000, best + 30))
 
 
 @dataclass
@@ -219,16 +219,8 @@ class SDRReceiver:
         Applies and restarts receiver with optimal squelch.
         """
         was_running = self._running
-        if self._process:
-            try:
-                self._process.terminate()
-                await asyncio.wait_for(self._process.wait(), timeout=1.0)
-            except Exception:
-                try:
-                    self._process.kill()
-                except Exception:
-                    pass
-            self._process = None
+        if was_running:
+            await self.stop()
             await asyncio.sleep(0.15)
 
         # Run probe in background thread to avoid blocking asyncio event loop
