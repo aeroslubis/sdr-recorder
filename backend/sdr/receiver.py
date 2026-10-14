@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
+from backend.dsp.filter import VoiceBandpassFilter
 from backend.dsp.squelch import SquelchEvaluator, SquelchResult, SquelchState
 from backend.sdr.dongle_config import DongleConfig
 
@@ -173,7 +174,8 @@ class SDRReceiver:
         # Active hardware squelch level override if calibrated
         self._active_squelch_l: Optional[int] = None
 
-        # Initialize DSP Squelch Evaluator
+        # Initialize DSP Squelch Evaluator & Voice Bandpass Filter (300 Hz - 3200 Hz)
+        self.voice_filter = VoiceBandpassFilter(sample_rate=self.sample_rate)
         self.squelch_evaluator = SquelchEvaluator(
             threshold_dbfs=self.config.squelch_threshold,
             hang_time_ms=self.config.hang_time_ms,
@@ -194,6 +196,7 @@ class SDRReceiver:
         # Active transmission accumulation
         self._current_transmission_chunks: List[bytes] = []
         self._current_transmission_start: Optional[datetime] = None
+        self._current_transmission_active_chunks: int = 0
         self._current_transmission_peak_rssi: float = -100.0
 
     @property
@@ -282,6 +285,10 @@ class SDRReceiver:
             "-l", squelch_l,
             "-E", "dc",
         ]
+
+        # Enable de-emphasis filter on FM modes to attenuate discriminator noise
+        if mod_arg in ["fm", "wbfm"]:
+            cmd.extend(["-E", "deemp"])
 
         if self.config.gain_mode == "manual":
             cmd.extend(["-g", str(self.config.rf_gain)])
@@ -374,22 +381,28 @@ class SDRReceiver:
             logger.error(f"Error executing callback {callback}: {e}", exc_info=True)
 
     async def _process_audio_chunk(self, chunk: bytes) -> None:
-        """Evaluates chunk with SquelchEvaluator and handles transmission recording."""
-        result = self.squelch_evaluator.process(chunk)
+        """Evaluates chunk with VoiceBandpassFilter and SquelchEvaluator and handles transmission recording."""
+        # Apply 300 Hz - 3200 Hz Voice Bandpass Filter to eliminate RF hiss and carrier rumble
+        filtered_chunk = self.voice_filter.process(chunk)
+
+        result = self.squelch_evaluator.process(filtered_chunk)
         self._last_rssi = result.rssi_dbfs
 
         # Handle transmission opened
         if result.transition == "opened":
             self._current_transmission_start = datetime.now(timezone.utc)
             self._current_transmission_chunks = []
+            self._current_transmission_active_chunks = 1
             if result.pre_roll:
                 self._current_transmission_chunks.append(result.pre_roll)
-            self._current_transmission_chunks.append(chunk)
+            self._current_transmission_chunks.append(filtered_chunk)
             self._current_transmission_peak_rssi = result.rssi_dbfs
         elif result.is_open:
             if not self._current_transmission_chunks:
                 self._current_transmission_start = datetime.now(timezone.utc)
-            self._current_transmission_chunks.append(chunk)
+            if result.state == SquelchState.OPEN:
+                self._current_transmission_active_chunks += 1
+            self._current_transmission_chunks.append(filtered_chunk)
             self._current_transmission_peak_rssi = max(
                 self._current_transmission_peak_rssi, result.rssi_dbfs
             )
@@ -402,24 +415,32 @@ class SDRReceiver:
                 audio_data = b"".join(self._current_transmission_chunks)
                 duration_sec = len(audio_data) / float(self.sample_rate * 2)
 
-                event = TransmissionEvent(
-                    audio_data=audio_data,
-                    start_time=start_time,
-                    end_time=end_time,
-                    duration_sec=duration_sec,
-                    peak_rssi_dbfs=self._current_transmission_peak_rssi,
-                    frequency_hz=self.config.frequency_hz,
-                    modulation=self.config.modulation,
-                )
+                # Suppress false triggers / squelch tails on PTT release:
+                # If active open squelch lasted less than 3 chunks (< 150 ms),
+                # it was just a transient pop / squelch tail burst, not genuine speech.
+                if self._current_transmission_active_chunks >= 3:
+                    event = TransmissionEvent(
+                        audio_data=audio_data,
+                        start_time=start_time,
+                        end_time=end_time,
+                        duration_sec=duration_sec,
+                        peak_rssi_dbfs=self._current_transmission_peak_rssi,
+                        frequency_hz=self.config.frequency_hz,
+                        modulation=self.config.modulation,
+                    )
+                    await self._safe_call(self.on_transmission_end_callback, event)
+                else:
+                    logger.debug(
+                        f"Suppressed transient squelch burst (active_chunks={self._current_transmission_active_chunks}, duration={duration_sec:.2f}s)"
+                    )
 
                 self._current_transmission_chunks = []
                 self._current_transmission_start = None
+                self._current_transmission_active_chunks = 0
                 self._current_transmission_peak_rssi = -100.0
 
-                await self._safe_call(self.on_transmission_end_callback, event)
-
         # Dispatch chunk callback
-        await self._safe_call(self.on_chunk_callback, chunk, result)
+        await self._safe_call(self.on_chunk_callback, filtered_chunk, result)
 
     async def _run_loop(self) -> None:
         """Main ingestion loop reading chunks from rtl_fm subprocess."""

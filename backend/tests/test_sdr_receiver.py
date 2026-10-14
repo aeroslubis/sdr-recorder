@@ -119,6 +119,18 @@ def test_build_rtl_fm_command():
     assert "dc" in cmd
     assert "direct" in cmd
 
+    # Test FM mode includes de-emphasis
+    config_fm = DongleConfig(
+        frequency_hz=435500000,
+        modulation="NFM",
+        device_index=0,
+    )
+    receiver_fm = SDRReceiver(config=config_fm)
+    cmd_fm = receiver_fm.build_rtl_fm_command()
+    assert "-E" in cmd_fm
+    assert "dc" in cmd_fm
+    assert "deemp" in cmd_fm
+
 
 @pytest.mark.asyncio
 async def test_sdr_receiver_stops_recording_when_hardware_disconnected():
@@ -174,4 +186,52 @@ async def test_receiver_update_config_handles_frequency_change():
     await receiver.update_config(new_cfg)
     assert receiver.config.frequency_hz == 145500000
     assert receiver.config.modulation == "NFM"
+
+
+@pytest.mark.asyncio
+async def test_squelch_tail_suppression():
+    """Verify that brief 1-chunk squelch bursts (< 150 ms) are suppressed as false triggers."""
+    transmissions_recorded = []
+
+    def on_transmission_end(event):
+        transmissions_recorded.append(event)
+
+    config = DongleConfig(
+        squelch_threshold=-40.0,
+        hang_time_ms=100,
+        pre_roll_ms=100,
+    )
+    receiver = SDRReceiver(
+        config=config,
+        on_transmission_end_callback=on_transmission_end,
+    )
+
+    # 1. Simulate a single 50ms squelch pop (burst)
+    burst_chunk = (np.sin(2 * np.pi * 1000 * np.linspace(0, 0.05, 1200)) * 25000).astype(np.int16).tobytes()
+    silence_chunk = np.zeros(1200, dtype=np.int16).tobytes()
+
+    # Squelch opens on burst_chunk (1 open chunk)
+    await receiver._process_audio_chunk(burst_chunk)
+    # Next chunk is silence -> squelch closes after hang-time
+    await receiver._process_audio_chunk(silence_chunk)
+    await receiver._process_audio_chunk(silence_chunk)
+    await receiver._process_audio_chunk(silence_chunk)
+
+    # The burst was only 1 chunk -> MUST BE SUPPRESSED (0 recorded events)
+    assert len(transmissions_recorded) == 0
+
+    # 2. Simulate a sustained voice transmission (4 consecutive chunks of voice)
+    await receiver._process_audio_chunk(burst_chunk)
+    await receiver._process_audio_chunk(burst_chunk)
+    await receiver._process_audio_chunk(burst_chunk)
+    await receiver._process_audio_chunk(burst_chunk)
+    # Squelch closes after silence
+    await receiver._process_audio_chunk(silence_chunk)
+    await receiver._process_audio_chunk(silence_chunk)
+    await receiver._process_audio_chunk(silence_chunk)
+
+    # Sustained speech -> MUST BE RECORDED
+    assert len(transmissions_recorded) == 1
+    assert transmissions_recorded[0].duration_sec >= 0.30
+
 
