@@ -47,13 +47,13 @@ describe('TopBar', () => {
     fireEvent.click(adminButton);
 
     // Verify only Settings and Sign Out appear in menu
-    expect(screen.getByText(/⚙ Settings/i)).toBeInTheDocument();
-    expect(screen.getByText(/🚪 Sign Out/i)).toBeInTheDocument();
+    expect(screen.getByText('Settings')).toBeInTheDocument();
+    expect(screen.getByText('Sign Out')).toBeInTheDocument();
     expect(screen.queryByText(/Channel Setup/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Storage & Retention Manager/i)).not.toBeInTheDocument();
 
     // Click Settings
-    fireEvent.click(screen.getByText(/⚙ Settings/i));
+    fireEvent.click(screen.getByText('Settings'));
     expect(handleOpenSettings).toHaveBeenCalledWith('dongle');
 
     // Open menu again & click Sign Out

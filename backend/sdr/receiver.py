@@ -236,7 +236,7 @@ class SDRReceiver:
         if not self._process or not self._process.stdout:
             return b"\x00" * self.chunk_bytes
 
-        if self._process.poll() is not None:
+        if self._process.returncode is not None:
             if not is_hardware_available(self.config.device_index):
                 self._is_hardware_connected = False
             return b"\x00" * self.chunk_bytes
@@ -389,7 +389,7 @@ class SDRReceiver:
                                 logger.warning(f"Failed to respawn rtl_fm on reconnect: {e}")
                     continue
 
-                if self._process is None or self._process.poll() is not None:
+                if self._process is None or self._process.returncode is not None:
                     if not is_hardware_available(self.config.device_index):
                         self._is_hardware_connected = False
                         continue

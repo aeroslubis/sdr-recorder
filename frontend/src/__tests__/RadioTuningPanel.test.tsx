@@ -35,8 +35,10 @@ describe('RadioTuningPanel & SMeterBar & DongleConfigModal & TopBar', () => {
     expect(screen.queryByText(/RECORDING LOCKED/i)).not.toBeInTheDocument();
 
     // No Add Preset button and no direct trash icons
-    expect(screen.queryByText(/Add Preset/i)).not.toBeInTheDocument();
-    expect(screen.queryByTitle(/Delete preset/i)).not.toBeInTheDocument();
+    // No demodulation mode selector on dashboard
+    expect(screen.queryByText(/Demodulation Mode/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /AM \(Airband\)/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /NFM \(VHF\/UHF\)/i })).not.toBeInTheDocument();
 
     // Active preset has RECORDING label
     expect(screen.getByText(/● RECORDING/i)).toBeInTheDocument();
@@ -145,11 +147,11 @@ describe('RadioTuningPanel & SMeterBar & DongleConfigModal & TopBar', () => {
     const adminButton = screen.getByRole('button', { name: /admin/i });
     fireEvent.click(adminButton);
 
-    expect(screen.getByText(/⚙ Settings/i)).toBeInTheDocument();
-    expect(screen.getByText(/🚪 Sign Out/i)).toBeInTheDocument();
+    expect(screen.getByText('Settings')).toBeInTheDocument();
+    expect(screen.getByText('Sign Out')).toBeInTheDocument();
     expect(screen.queryByText(/Storage & Retention/i)).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByText(/⚙ Settings/i));
+    fireEvent.click(screen.getByText('Settings'));
     expect(handleOpenDongleConfig).toHaveBeenCalledTimes(1);
 
     fireEvent.click(adminButton);

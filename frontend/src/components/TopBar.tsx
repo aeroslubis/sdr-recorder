@@ -146,7 +146,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                 className="w-full flex items-center gap-2.5 px-4 py-2 text-silver-mist hover:text-snow hover:bg-charcoal text-left transition-colors cursor-pointer"
               >
                 <Sliders className="w-4 h-4 text-phosphor-green" />
-                <span>⚙ Settings</span>
+                <span>Settings</span>
               </button>
 
               <div className="my-1 border-t border-charcoal" />
@@ -160,7 +160,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                 className="w-full flex items-center gap-2.5 px-4 py-2 text-silver-mist hover:text-red-400 hover:bg-charcoal text-left transition-colors cursor-pointer"
               >
                 <LogOut className="w-4 h-4 text-smoke" />
-                <span>🚪 Sign Out</span>
+                <span>Sign Out</span>
               </button>
             </div>
           )}

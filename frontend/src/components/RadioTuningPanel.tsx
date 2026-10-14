@@ -90,10 +90,6 @@ export const RadioTuningPanel: React.FC<RadioTuningPanelProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleModulationChange = (mod: string) => {
-    onTune({ modulation: mod });
-  };
-
   const handleSquelchChange = (threshold: number) => {
     onTune({ squelchThreshold: threshold });
   };
@@ -163,37 +159,6 @@ export const RadioTuningPanel: React.FC<RadioTuningPanelProps> = ({
           </div>
           <div className="text-[11px] text-smoke font-mono mt-1">
             {(frequencyHz / 1e6).toFixed(4)} MHz · {modulation}
-          </div>
-        </div>
-
-        {/* Modulation Mode Selector */}
-        <div>
-          <div className="text-[11px] text-smoke uppercase tracking-wider mb-2 font-medium">
-            Demodulation Mode
-          </div>
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <button
-              type="button"
-              onClick={() => handleModulationChange('AM')}
-              className={`py-2 px-3 rounded-inputs font-medium transition-colors border ${
-                modulation.toUpperCase() === 'AM'
-                  ? 'bg-ash text-phosphor-green border-phosphor-green/50'
-                  : 'bg-obsidian text-silver-mist border-charcoal hover:border-slate'
-              }`}
-            >
-              AM (Airband)
-            </button>
-            <button
-              type="button"
-              onClick={() => handleModulationChange('NFM')}
-              className={`py-2 px-3 rounded-inputs font-medium transition-colors border ${
-                modulation.toUpperCase() === 'NFM'
-                  ? 'bg-ash text-phosphor-green border-phosphor-green/50'
-                  : 'bg-obsidian text-silver-mist border-charcoal hover:border-slate'
-              }`}
-            >
-              NFM (VHF/UHF)
-            </button>
           </div>
         </div>
 

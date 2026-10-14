@@ -125,6 +125,23 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
     [token]
   );
 
+  // Resume Web AudioContext on first user interaction to satisfy browser autoplay policy
+  useEffect(() => {
+    const unlockAudio = () => {
+      if (audioPlayerRef.current) {
+        audioPlayerRef.current.resumeContext().catch(() => {});
+      }
+    };
+    window.addEventListener('click', unlockAudio);
+    window.addEventListener('keydown', unlockAudio);
+    window.addEventListener('touchstart', unlockAudio);
+    return () => {
+      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('keydown', unlockAudio);
+      window.removeEventListener('touchstart', unlockAudio);
+    };
+  }, []);
+
   // Fetch initial Radio status, presets, active dates & system storage settings
   useEffect(() => {
     authFetch('/api/radio/status')
@@ -505,7 +522,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
   };
 
   return (
-    <div className={`min-h-screen bg-obsidian text-snow flex flex-col font-circular ${className}`}>
+    <div className={`h-screen max-h-screen overflow-hidden bg-obsidian text-snow flex flex-col font-circular ${className}`}>
       {/* 1. TopBar Header */}
       <TopBar
         frequencyHz={frequencyHz}
@@ -520,9 +537,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
       />
 
       {/* 2. Responsive 3-Column Dashboard Body */}
-      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+      <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden">
         {/* Left Column: Radio Tuning Panel (300px) */}
-        <div className="w-full lg:w-72 xl:w-80 shrink-0 border-r border-charcoal bg-obsidian/40 overflow-y-auto">
+        <div className="w-full lg:w-72 xl:w-80 shrink-0 border-r border-charcoal bg-obsidian/40 overflow-y-auto h-full min-h-0">
           <RadioTuningPanel
             frequencyHz={frequencyHz}
             modulation={modulation}
@@ -540,7 +557,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
         </div>
 
         {/* Center Column: Live Monitor, Spectrum, Timeline Scrubber & Playback Controls */}
-        <main className="flex-1 flex flex-col overflow-y-auto p-4 md:p-6 gap-4 bg-obsidian">
+        <main className="flex-1 min-w-0 min-h-0 flex flex-col overflow-y-auto p-4 md:p-6 gap-4 bg-obsidian h-full">
           {/* Live Audio Monitor & Telemetry Bar */}
           <div className="bg-ash/80 backdrop-blur border border-charcoal rounded-cards px-4 py-3 flex flex-wrap items-center justify-between gap-3 select-none">
             {/* Live Reception Status */}

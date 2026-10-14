@@ -67,19 +67,21 @@ export class WebAudioPlayer {
   }
 
   private updateDspRouting(): void {
-    if (!this.sourceNode || !this.gainNode || !this.audioContext) return;
+    if (!this.gainNode || !this.audioContext) return;
 
     try {
-      this.sourceNode.disconnect();
-      if (this.filterNode) {
-        this.filterNode.disconnect();
-      }
+      if (this.sourceNode) {
+        this.sourceNode.disconnect();
+        if (this.filterNode) {
+          this.filterNode.disconnect();
+        }
 
-      if (this.dspFilterEnabled && this.filterNode) {
-        this.sourceNode.connect(this.filterNode);
-        this.filterNode.connect(this.gainNode);
-      } else {
-        this.sourceNode.connect(this.gainNode);
+        if (this.dspFilterEnabled && this.filterNode) {
+          this.sourceNode.connect(this.filterNode);
+          this.filterNode.connect(this.gainNode);
+        } else {
+          this.sourceNode.connect(this.gainNode);
+        }
       }
 
       if (this.analyserNode) {
@@ -252,7 +254,7 @@ export class WebAudioPlayer {
     }
 
     const now = this.audioContext.currentTime;
-    if (this.nextPlayTime < now) {
+    if (this.nextPlayTime < now || this.nextPlayTime > now + 0.35) {
       this.nextPlayTime = now + 0.02;
     }
 

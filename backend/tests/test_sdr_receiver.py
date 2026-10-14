@@ -130,31 +130,34 @@ async def test_sdr_receiver_stops_recording_when_hardware_disconnected():
     def on_transmission_end(event):
         transmissions_recorded.append(event)
 
+    from unittest.mock import patch
+
     config = DongleConfig(
         squelch_threshold=-42.0,
         hang_time_ms=100,
         pre_roll_ms=100,
     )
-    receiver = SDRReceiver(
-        config=config,
-        on_chunk_callback=on_chunk,
-        on_transmission_end_callback=on_transmission_end,
-    )
-    assert receiver.is_simulator is False
-    assert receiver.is_hardware_connected is False
+    with patch("backend.sdr.receiver.is_hardware_available", return_value=False):
+        receiver = SDRReceiver(
+            config=config,
+            on_chunk_callback=on_chunk,
+            on_transmission_end_callback=on_transmission_end,
+        )
+        assert receiver.is_simulator is False
+        assert receiver.is_hardware_connected is False
 
-    # Start receiver
-    await receiver.start()
-    assert receiver.is_running is True
+        # Start receiver
+        await receiver.start()
+        assert receiver.is_running is True
 
-    # Let loop tick briefly while disconnected
-    await asyncio.sleep(0.12)
+        # Let loop tick briefly while disconnected
+        await asyncio.sleep(0.12)
 
-    await receiver.stop()
-    assert receiver.is_running is False
-    assert len(chunks_received) > 0
-    # When hardware is disconnected: radio recording is stopped completely (0 transmissions)
-    assert len(transmissions_recorded) == 0
-    for _chunk, result in chunks_received:
-        assert result.is_open is False
-        assert result.rssi_dbfs == -100.0
+        await receiver.stop()
+        assert receiver.is_running is False
+        assert len(chunks_received) > 0
+        # When hardware is disconnected: radio recording is stopped completely (0 transmissions)
+        assert len(transmissions_recorded) == 0
+        for _chunk, result in chunks_received:
+            assert result.is_open is False
+            assert result.rssi_dbfs == -100.0
