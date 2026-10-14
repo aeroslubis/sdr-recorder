@@ -5,18 +5,26 @@ from backend.main import create_app
 from backend.sdr.receiver import get_available_devices
 
 
+from unittest.mock import patch
+
 def test_get_available_devices_returns_list():
     devices = get_available_devices()
     assert isinstance(devices, list)
-    assert len(devices) >= 1
-    assert "index" in devices[0]
-    assert "name" in devices[0]
-    assert "available" in devices[0]
+
+    # Test with simulated hardware output from rtl_test
+    with patch("shutil.which", return_value="/usr/bin/rtl_test"), patch("subprocess.run") as mock_run:
+        mock_run.return_value.stdout = b"0: Realtek, RTL2838UHIDIR, SN: 00000001\n"
+        mock_run.return_value.stderr = b""
+        mock_run.return_value.returncode = 0
+        detected = get_available_devices()
+        assert len(detected) == 1
+        assert detected[0]["index"] == 0
+        assert "Realtek" in detected[0]["name"]
 
 
 def test_system_settings_and_devices_api(tmp_path):
     test_db = str(tmp_path / "test_settings.db")
-    app = create_app(db_path=test_db, force_simulator=True, test_mode=True)
+    app = create_app(db_path=test_db, force_simulator=False, test_mode=True)
     with TestClient(app) as client:
         # Login
         login_res = client.post("/api/auth/login", json={"username": "admin", "password": "12345"})
@@ -29,8 +37,6 @@ def test_system_settings_and_devices_api(tmp_path):
         assert dev_res.status_code == 200
         devices = dev_res.json()
         assert isinstance(devices, list)
-        assert len(devices) >= 1
-        assert "name" in devices[0]
 
         # GET /api/system/settings
         get_res = client.get("/api/system/settings", headers=headers)

@@ -77,13 +77,6 @@ def get_available_devices() -> List[Dict[str, Any]]:
         except Exception as e:
             logger.debug(f"Device enumeration exception: {e}")
 
-    if not devices:
-        devices.append({
-            "index": 0,
-            "name": "Mock SDR Simulator (Virtual)",
-            "available": True,
-        })
-
     return devices
 
 
@@ -151,16 +144,8 @@ class SDRReceiver:
             sample_rate=self.sample_rate,
         )
 
-        # Initialize Mock Simulator
-        self.simulator = MockSDRSimulator(
-            sample_rate=self.sample_rate,
-            chunk_ms=self.chunk_ms,
-            realtime=True,
-        )
-
-        # Hardware mode detection
-        self._is_simulator = self.force_simulator or not is_hardware_available(self.config.device_index)
-        self._is_hardware_connected = not self._is_simulator
+        # Hardware connection detection
+        self._is_hardware_connected = is_hardware_available(self.config.device_index)
         self._last_hw_check_time: float = 0.0
 
         # State tracking
@@ -180,7 +165,7 @@ class SDRReceiver:
 
     @property
     def is_simulator(self) -> bool:
-        return self._is_simulator
+        return False
 
     @property
     def is_hardware_connected(self) -> bool:
@@ -348,8 +333,8 @@ class SDRReceiver:
         await self._safe_call(self.on_chunk_callback, chunk, result)
 
     async def _run_loop(self) -> None:
-        """Main ingestion loop reading chunks from either rtl_fm subprocess or simulator."""
-        if not self._is_simulator:
+        """Main ingestion loop reading chunks from rtl_fm subprocess."""
+        if self._is_hardware_connected:
             cmd = self.build_rtl_fm_command()
             try:
                 self._process = await asyncio.create_subprocess_exec(
@@ -359,42 +344,64 @@ class SDRReceiver:
                 )
                 self._is_hardware_connected = True
             except Exception as e:
-                logger.warning(f"Failed to spawn rtl_fm ({e}), falling back to MockSDRSimulator.")
-                self._is_simulator = True
+                logger.warning(f"Failed to spawn rtl_fm ({e}).")
                 self._is_hardware_connected = False
 
         while self._running:
             try:
-                if self.force_simulator or self._is_simulator:
-                    chunk = await self.simulator.read_chunk()
-                else:
-                    if not self._is_hardware_connected:
-                        chunk = b"\x00" * self.chunk_bytes
-                        await asyncio.sleep(self.chunk_ms / 1000.0)
-                        now = time.monotonic()
-                        if now - self._last_hw_check_time > 2.0:
-                            self._last_hw_check_time = now
-                            if is_hardware_available(self.config.device_index):
-                                logger.info(f"RTL-SDR dongle {self.config.device_index} reconnected. Restarting...")
-                                try:
-                                    if self._process:
-                                        self._process.kill()
-                                except Exception:
-                                    pass
-                                cmd = self.build_rtl_fm_command()
-                                try:
-                                    self._process = await asyncio.create_subprocess_exec(
-                                        *cmd,
-                                        stdout=asyncio.subprocess.PIPE,
-                                        stderr=asyncio.subprocess.DEVNULL,
-                                    )
-                                    self._is_hardware_connected = True
-                                except Exception as e:
-                                    logger.warning(f"Failed to respawn rtl_fm on reconnect: {e}")
-                    else:
-                        assert self._process is not None
-                        chunk = await self._read_hardware_chunk()
+                if not self._is_hardware_connected:
+                    # No SDR hardware detected: STOP RECORDING RADIO!
+                    self._current_transmission_chunks = []
+                    self._current_transmission_start = None
+                    self._current_transmission_peak_rssi = -100.0
+                    self._last_rssi = -100.0
 
+                    chunk = b"\x00" * self.chunk_bytes
+                    dummy_result = SquelchResult(
+                        is_open=False,
+                        state=SquelchState.CLOSED,
+                        rssi_dbfs=-100.0,
+                        transition="none",
+                        pre_roll=b"",
+                    )
+                    await self._safe_call(self.on_chunk_callback, chunk, dummy_result)
+                    await asyncio.sleep(self.chunk_ms / 1000.0)
+
+                    now = time.monotonic()
+                    if now - self._last_hw_check_time > 1.5:
+                        self._last_hw_check_time = now
+                        if is_hardware_available(self.config.device_index):
+                            logger.info(f"RTL-SDR dongle {self.config.device_index} reconnected. Restarting...")
+                            try:
+                                if self._process:
+                                    self._process.kill()
+                            except Exception:
+                                pass
+                            cmd = self.build_rtl_fm_command()
+                            try:
+                                self._process = await asyncio.create_subprocess_exec(
+                                    *cmd,
+                                    stdout=asyncio.subprocess.PIPE,
+                                    stderr=asyncio.subprocess.DEVNULL,
+                                )
+                                self._is_hardware_connected = True
+                            except Exception as e:
+                                logger.warning(f"Failed to respawn rtl_fm on reconnect: {e}")
+                    continue
+
+                if self._process is None or self._process.poll() is not None:
+                    if not is_hardware_available(self.config.device_index):
+                        self._is_hardware_connected = False
+                        continue
+                    else:
+                        cmd = self.build_rtl_fm_command()
+                        self._process = await asyncio.create_subprocess_exec(
+                            *cmd,
+                            stdout=asyncio.subprocess.PIPE,
+                            stderr=asyncio.subprocess.DEVNULL,
+                        )
+
+                chunk = await self._read_hardware_chunk()
                 if not chunk:
                     break
 
@@ -416,10 +423,7 @@ class SDRReceiver:
         if self._running:
             return
 
-        # Re-check hardware unless explicitly forced to simulator
-        if not self.force_simulator:
-            self._is_simulator = not is_hardware_available(self.config.device_index)
-
+        self._is_hardware_connected = is_hardware_available(self.config.device_index)
         self._running = True
         self._loop_task = asyncio.create_task(self._run_loop())
 

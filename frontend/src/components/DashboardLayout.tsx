@@ -10,6 +10,7 @@ import { LiveSpectrumVisualizer } from './LiveSpectrumVisualizer';
 import { DongleHardwareConfig } from './DongleConfigModal';
 import { WebAudioPlayer } from '../audio/WebAudioPlayer';
 import { formatDate } from './HistoryDatePicker';
+import { NoDeviceModal } from './NoDeviceModal';
 import { Filter, Radio } from 'lucide-react';
 
 export interface DashboardLayoutProps {
@@ -29,8 +30,15 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
   const [squelchThreshold, setSquelchThreshold] = useState<number>(-42.0);
   const [rfGain, setRfGain] = useState<number>(38.6);
   const [ppmOffset, setPpmOffset] = useState<number>(0);
-  const [isSimulator, setIsSimulator] = useState<boolean>(true);
   const [hardwareConnected, setHardwareConnected] = useState<boolean>(true);
+  const [dismissedNoDeviceModal, setDismissedNoDeviceModal] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (hardwareConnected) {
+      setDismissedNoDeviceModal(false);
+    }
+  }, [hardwareConnected]);
+
   const [presets, setPresets] = useState<PresetItem[]>([]);
 
   // Live WebSocket Telemetry & Audio Streaming
@@ -133,7 +141,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
           }
           if (data.rf_gain !== undefined) setRfGain(data.rf_gain);
           if (data.ppm_offset !== undefined) setPpmOffset(data.ppm_offset);
-          if (data.is_simulator !== undefined) setIsSimulator(data.is_simulator);
           if (data.hardware_connected !== undefined) setHardwareConnected(data.hardware_connected);
         }
       })
@@ -212,7 +219,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
               if (msg.frequency_hz !== undefined) setFrequencyHz(msg.frequency_hz);
               if (msg.modulation !== undefined) setModulation(msg.modulation);
               if (msg.hardware_connected !== undefined) setHardwareConnected(msg.hardware_connected);
-              if (msg.is_simulator !== undefined) setIsSimulator(msg.is_simulator);
             }
           } catch {}
         } else if (event.data instanceof ArrayBuffer) {
@@ -482,13 +488,29 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
     return { success: true };
   };
 
+  // Re-check SDR Dongle Hardware Connection
+  const handleRetryCheckDevice = async () => {
+    try {
+      const res = await authFetch('/api/radio/status');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.hardware_connected !== undefined) {
+          setHardwareConnected(data.hardware_connected);
+          if (data.hardware_connected) {
+            setDismissedNoDeviceModal(false);
+          }
+        }
+      }
+    } catch {}
+  };
+
   return (
     <div className={`min-h-screen bg-obsidian text-snow flex flex-col font-circular ${className}`}>
       {/* 1. TopBar Header */}
       <TopBar
         frequencyHz={frequencyHz}
         modulation={modulation}
-        isSimulator={isSimulator}
+        hardwareConnected={hardwareConnected}
         username={user?.username || 'admin'}
         onOpenSettings={(tab) => {
           setSettingsTab(tab);
@@ -525,7 +547,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
             <div className="flex items-center gap-3 font-mono text-xs">
               <div
                 className={`w-2.5 h-2.5 rounded-full ${
-                  isRecording
+                  !hardwareConnected
+                    ? 'bg-red-500'
+                    : isRecording
                     ? 'bg-red-500 animate-ping'
                     : squelchOpen
                     ? 'bg-phosphor-green animate-pulse'
@@ -533,7 +557,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
                 }`}
               />
               <span className="font-semibold text-snow">
-                {isRecording
+                {!hardwareConnected
+                  ? 'RECORDING STOPPED (TIDAK ADA SDR DEVICE)'
+                  : isRecording
                   ? 'RECORDING TRANSMISSION'
                   : squelchOpen
                   ? 'CARRIER DETECTED (OPEN)'
@@ -541,7 +567,10 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
               </span>
               <span className="text-smoke">·</span>
               <span className="text-silver-mist">
-                RSSI: <span className="text-phosphor-green">{liveRssi.toFixed(1)} dBFS</span>
+                RSSI:{' '}
+                <span className={!hardwareConnected ? 'text-red-400' : 'text-phosphor-green'}>
+                  {liveRssi.toFixed(1)} dBFS
+                </span>
               </span>
             </div>
 
@@ -654,6 +683,17 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
           ppm_offset: ppmOffset,
         }}
         initialStorageSettings={storageSettings}
+      />
+
+      {/* Warning Popup when No SDR Dongle is Connected */}
+      <NoDeviceModal
+        isOpen={!hardwareConnected && !dismissedNoDeviceModal}
+        onClose={() => setDismissedNoDeviceModal(true)}
+        onRetry={handleRetryCheckDevice}
+        onOpenSettings={() => {
+          setSettingsTab('dongle');
+          setIsSettingsOpen(true);
+        }}
       />
     </div>
   );

@@ -120,7 +120,7 @@ def test_build_rtl_fm_command():
 
 
 @pytest.mark.asyncio
-async def test_sdr_receiver_ingest_loop_with_simulator():
+async def test_sdr_receiver_stops_recording_when_hardware_disconnected():
     chunks_received = []
     transmissions_recorded = []
 
@@ -139,40 +139,22 @@ async def test_sdr_receiver_ingest_loop_with_simulator():
         config=config,
         on_chunk_callback=on_chunk,
         on_transmission_end_callback=on_transmission_end,
-        force_simulator=True,
     )
-    assert receiver.is_simulator is True
+    assert receiver.is_simulator is False
+    assert receiver.is_hardware_connected is False
 
-    # Configure simulator to not delay
-    receiver.simulator.realtime = False
-    
     # Start receiver
     await receiver.start()
     assert receiver.is_running is True
 
-    # 1. Feed baseline noise (squelch stays closed)
-    receiver.simulator.trigger_noise()
-    for _ in range(5):
-        await asyncio.sleep(0.01)
-
-    # 2. Trigger voice burst (squelch opens)
-    receiver.simulator.trigger_burst(duration_ms=150)
-    for _ in range(10):
-        await asyncio.sleep(0.01)
-
-    # 3. Revert to noise so hang time expires and squelch closes
-    receiver.simulator.trigger_noise()
-    for _ in range(15):
-        await asyncio.sleep(0.01)
+    # Let loop tick briefly while disconnected
+    await asyncio.sleep(0.12)
 
     await receiver.stop()
     assert receiver.is_running is False
     assert len(chunks_received) > 0
-    assert len(transmissions_recorded) >= 1
-
-    trans = transmissions_recorded[0]
-    assert trans.audio_data is not None
-    assert len(trans.audio_data) > 0
-    assert trans.duration_sec > 0
-    assert trans.peak_rssi_dbfs > -42.0
-    assert trans.frequency_hz == config.frequency_hz
+    # When hardware is disconnected: radio recording is stopped completely (0 transmissions)
+    assert len(transmissions_recorded) == 0
+    for _chunk, result in chunks_received:
+        assert result.is_open is False
+        assert result.rssi_dbfs == -100.0

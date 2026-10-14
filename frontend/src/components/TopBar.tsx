@@ -12,6 +12,7 @@ export interface TopBarProps {
   frequencyHz?: number;
   modulation?: string;
   isSimulator?: boolean;
+  hardwareConnected?: boolean;
   diskUsedGB?: number;
   diskTotalGB?: number;
   username?: string;
@@ -26,7 +27,8 @@ export interface TopBarProps {
 export const TopBar: React.FC<TopBarProps> = ({
   frequencyHz: _frequencyHz = 118200000,
   modulation: _modulation = 'AM',
-  isSimulator = false,
+  isSimulator: _isSimulator = false,
+  hardwareConnected = true,
   diskUsedGB = 14.8,
   diskTotalGB = 100,
   username = 'admin',
@@ -83,15 +85,15 @@ export const TopBar: React.FC<TopBarProps> = ({
 
       {/* Center / Right System Metrics */}
       <div className="flex items-center gap-5">
-        {/* Hardware Status Pill (Clean single colored indicator dot without duplicate white icon) */}
+        {/* Hardware Status Pill */}
         <div className="flex items-center gap-1.5 px-3 py-1 bg-ash border border-charcoal rounded-pill text-xs font-mono">
           <div
             className={`w-2 h-2 rounded-full ${
-              isSimulator ? 'bg-amber-400' : 'bg-phosphor-green animate-pulse'
+              hardwareConnected ? 'bg-phosphor-green animate-pulse' : 'bg-red-400'
             }`}
           />
-          <span className={isSimulator ? 'text-amber-400' : 'text-silver-mist'}>
-            {isSimulator ? 'SIMULATOR MODE' : 'RTL-SDR ONLINE'}
+          <span className={hardwareConnected ? 'text-silver-mist' : 'text-red-400'}>
+            {hardwareConnected ? 'RTL-SDR ONLINE' : 'NO SDR DEVICE'}
           </span>
         </div>
 
