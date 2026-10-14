@@ -24,7 +24,6 @@ services:
       - ./storage:/app/storage
       # Sync server timezone with host VPS
       - /etc/localtime:/etc/localtime:ro
-      - /etc/timezone:/etc/timezone:ro
     # RTL-SDR USB Dongle hardware pass-through
     # If running purely in Mock Simulator mode without USB dongle, these can remain active
     privileged: true
