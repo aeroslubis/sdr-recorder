@@ -90,17 +90,17 @@ def _get_storage_info() -> Dict[str, Any]:
 @router.get("/stats")
 def get_system_stats(request: Request) -> Dict[str, Any]:
     """
-    Returns hardware status, simulator status, CPU, RAM, storage,
+    Returns hardware status, CPU, RAM, storage,
     and active recording state.
     """
     receiver = getattr(request.app.state, "receiver", None)
-    is_simulator = getattr(receiver, "is_simulator", True) if receiver else True
+    is_hw = receiver.is_hardware_connected if receiver else False
     is_recording = getattr(receiver, "is_recording", False) if receiver else False
     is_running = getattr(receiver, "is_running", False) if receiver else False
 
     return {
-        "simulator_mode": is_simulator,
-        "is_hardware_connected": not is_simulator,
+        "hardware_connected": is_hw,
+        "is_hardware_connected": is_hw,
         "is_running": is_running,
         "is_recording": is_recording,
         "cpu_percent": _get_cpu_percent(),

@@ -24,7 +24,7 @@ def test_get_available_devices_returns_list():
 
 def test_system_settings_and_devices_api(tmp_path):
     test_db = str(tmp_path / "test_settings.db")
-    app = create_app(db_path=test_db, force_simulator=False, test_mode=True)
+    app = create_app(db_path=test_db, test_mode=True)
     with TestClient(app) as client:
         # Login
         login_res = client.post("/api/auth/login", json={"username": "admin", "password": "12345"})

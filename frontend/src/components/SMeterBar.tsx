@@ -6,7 +6,6 @@ export interface SMeterBarProps {
   squelchOpen: boolean;
   onSquelchChange?: (newThreshold: number) => void;
   disabled?: boolean;
-  isAuto?: boolean;
   className?: string;
 }
 
@@ -21,7 +20,6 @@ export const SMeterBar: React.FC<SMeterBarProps> = ({
   squelchOpen,
   onSquelchChange,
   disabled = false,
-  isAuto = false,
   className = '',
 }) => {
   const barRef = useRef<HTMLDivElement>(null);
@@ -89,11 +87,6 @@ export const SMeterBar: React.FC<SMeterBarProps> = ({
           <span className={isBypass ? 'text-amber-400 font-semibold' : 'text-silver-mist'}>
             {isBypass ? 'BYPASS' : `${clampedThreshold.toFixed(1)} dBFS`}
           </span>
-          {isAuto && (
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-phosphor-green/20 text-phosphor-green border border-phosphor-green/40 font-medium">
-              AUTO
-            </span>
-          )}
         </div>
       </div>
 

@@ -12,10 +12,10 @@ export interface LiveSpectrumVisualizerProps {
 }
 
 export const LiveSpectrumVisualizer: React.FC<LiveSpectrumVisualizerProps> = ({
-  frequencyHz = 435500000,
+  frequencyHz,
   modulation = 'NFM',
   squelchOpen = false,
-  rssi = -80.0,
+  rssi = -100.0,
   hardwareConnected = true,
   analyserNode = null,
   className = '',
@@ -54,10 +54,10 @@ export const LiveSpectrumVisualizer: React.FC<LiveSpectrumVisualizerProps> = ({
 
     const render = () => {
       const {
-        frequencyHz: curFreq = 435500000,
+        frequencyHz: curFreq = 0,
         modulation: curMod = 'NFM',
         squelchOpen: curSquelchOpen,
-        rssi: curRssi,
+        rssi: curRssi = -100.0,
         hardwareConnected: curHwConnected,
         analyserNode: curAnalyser,
       } = stateRef.current;

@@ -180,7 +180,6 @@ export const RadioTuningPanel: React.FC<RadioTuningPanelProps> = ({
             squelchOpen={squelchOpen}
             onSquelchChange={handleSquelchChange}
             disabled={isAutoSquelch}
-            isAuto={isAutoSquelch}
           />
 
           {/* Quick DSP Filter & Squelch Auto/Manual buttons */}

@@ -24,7 +24,6 @@ logger = logging.getLogger(__name__)
 
 def create_app(
     db_path: Optional[str] = None,
-    force_simulator: bool = False,
     test_mode: bool = False,
 ) -> FastAPI:
     """Create and configure the FastAPI SDR-Recorder NVR application."""
@@ -89,11 +88,9 @@ def create_app(
 
     # Attach state
     app.state.db_path = resolved_db_path
-    app.state.force_simulator = force_simulator
     app.state.test_mode = test_mode
     app.state.receiver = SDRReceiver(
         config=dongle_cfg,
-        force_simulator=force_simulator or test_mode,
     )
 
     # Register transmission completed callback to persist audio & metadata
@@ -148,7 +145,7 @@ def create_app(
     def health_check() -> Dict[str, Any]:
         return {
             "status": "ok",
-            "is_simulator": app.state.receiver.is_simulator,
+            "hardware_connected": app.state.receiver.is_hardware_connected,
             "is_running": app.state.receiver.is_running,
         }
 

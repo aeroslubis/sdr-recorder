@@ -100,7 +100,7 @@ def test_build_rtl_fm_command():
         direct_sampling=1,
         device_index=0,
     )
-    receiver = SDRReceiver(config=config, force_simulator=True)
+    receiver = SDRReceiver(config=config)
     cmd = receiver.build_rtl_fm_command()
     
     assert "rtl_fm" in cmd[0]
@@ -143,7 +143,6 @@ async def test_sdr_receiver_stops_recording_when_hardware_disconnected():
             on_chunk_callback=on_chunk,
             on_transmission_end_callback=on_transmission_end,
         )
-        assert receiver.is_simulator is False
         assert receiver.is_hardware_connected is False
 
         # Start receiver

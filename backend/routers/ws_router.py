@@ -73,7 +73,6 @@ class ConnectionManager:
         frequency_hz = 118200000
         modulation = "AM"
 
-        is_simulator = False
         hardware_connected = True
 
         if app is not None and hasattr(app, "state"):
@@ -85,8 +84,7 @@ class ConnectionManager:
                 state_str = state.value if hasattr(state, "value") else str(state)
                 chunks = getattr(receiver, "_current_transmission_chunks", [])
                 recording = squelch_open or (len(chunks) > 0)
-                is_simulator = getattr(receiver, "is_simulator", False)
-                hardware_connected = getattr(receiver, "is_hardware_connected", not is_simulator)
+                hardware_connected = getattr(receiver, "is_hardware_connected", True)
                 if hasattr(receiver, "config"):
                     frequency_hz = getattr(receiver.config, "frequency_hz", frequency_hz)
                     modulation = getattr(receiver.config, "modulation", modulation)
@@ -99,7 +97,6 @@ class ConnectionManager:
             "state": state_str,
             "frequency_hz": int(frequency_hz),
             "modulation": str(modulation),
-            "is_simulator": bool(is_simulator),
             "hardware_connected": bool(hardware_connected),
         }
 
@@ -209,7 +206,6 @@ class ConnectionManager:
         modulation = "AM"
         recording = squelch_open
 
-        is_simulator = False
         hardware_connected = True
         if receiver is not None:
             if hasattr(receiver, "config"):
@@ -217,8 +213,7 @@ class ConnectionManager:
                 modulation = getattr(receiver.config, "modulation", modulation)
             chunks = getattr(receiver, "_current_transmission_chunks", [])
             recording = squelch_open or (len(chunks) > 0)
-            is_simulator = getattr(receiver, "is_simulator", False)
-            hardware_connected = getattr(receiver, "is_hardware_connected", not is_simulator)
+            hardware_connected = getattr(receiver, "is_hardware_connected", True)
 
         telemetry = {
             "type": "telemetry",
@@ -228,7 +223,6 @@ class ConnectionManager:
             "state": state_str,
             "frequency_hz": int(frequency_hz),
             "modulation": str(modulation),
-            "is_simulator": bool(is_simulator),
             "hardware_connected": bool(hardware_connected),
         }
         self._latest_telemetry = telemetry

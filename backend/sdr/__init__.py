@@ -1,12 +1,11 @@
-"""SDR Ingestion and Hardware Emulation Package."""
+"""SDR Ingestion and Radio Processing Package."""
 from backend.sdr.dongle_config import DongleConfig
-from backend.sdr.simulator import MockSDRSimulator
-from backend.sdr.receiver import SDRReceiver, TransmissionEvent, is_hardware_available
+from backend.sdr.receiver import SDRReceiver, TransmissionEvent, is_hardware_available, probe_squelch_level
 
 __all__ = [
     "DongleConfig",
-    "MockSDRSimulator",
     "SDRReceiver",
     "TransmissionEvent",
     "is_hardware_available",
+    "probe_squelch_level",
 ]

@@ -27,7 +27,7 @@ def test_full_nvr_cycle_with_simulator(tmp_path):
     storage_dir = tmp_path / "recordings"
     storage_dir.mkdir(parents=True, exist_ok=True)
 
-    app = create_app(db_path=db_file, force_simulator=True, test_mode=True)
+    app = create_app(db_path=db_file, test_mode=True)
     client = TestClient(app)
 
     # 1. Login with default admin / 12345
@@ -36,11 +36,11 @@ def test_full_nvr_cycle_with_simulator(tmp_path):
     token = login_res.json()["token"]
     headers = {"Authorization": f"Bearer {token}"}
 
-    # 2. Check simulator hardware status via /api/system/stats
+    # 2. Check hardware status via /api/system/stats
     stats_res = client.get("/api/system/stats", headers=headers)
     assert stats_res.status_code == 200, f"Stats request failed: {stats_res.text}"
     stats = stats_res.json()
-    assert stats["simulator_mode"] is True
+    assert "hardware_connected" in stats
     assert "cpu_percent" in stats
     assert "memory" in stats
     assert "storage" in stats

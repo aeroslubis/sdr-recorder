@@ -21,9 +21,9 @@ from fastapi.staticfiles import StaticFiles
 from backend.main import create_app
 
 
-def build_app(force_simulator: bool = False):
+def build_app():
     """Creates the FastAPI app and configures SPA static asset mounting if built frontend exists."""
-    app = create_app(force_simulator=force_simulator)
+    app = create_app()
 
     base_dir = Path(__file__).resolve().parent.parent
     dist_dir = base_dir / "frontend" / "dist"
@@ -56,15 +56,13 @@ def build_app(force_simulator: bool = False):
 
 def create_app_factory():
     """Application factory for uvicorn with reload support."""
-    force_sim = os.environ.get("SDR_FORCE_SIMULATOR", "").lower() in ["1", "true", "yes"]
-    return build_app(force_simulator=force_sim)
+    return build_app()
 
 
 def main():
     parser = argparse.ArgumentParser(description="SDR-Recorder NVR Server")
     parser.add_argument("--host", default=os.environ.get("SDR_HOST", "0.0.0.0"), help="Host IP to bind (default: 0.0.0.0)")
     parser.add_argument("--port", type=int, default=int(os.environ.get("SDR_PORT", "8000")), help="Port to bind (default: 8000)")
-    parser.add_argument("--simulator", action="store_true", help="Force Mock SDR Simulator mode")
     parser.add_argument("--reload", action="store_true", help="Enable uvicorn auto-reload")
     parser.add_argument("--reset-password", action="store_true", help="Reset admin password to default (12345) and exit")
     args = parser.parse_args()
@@ -83,20 +81,15 @@ def main():
         print(f"[✓] Successfully reset password for '{app_config.DEFAULT_ADMIN_USERNAME}' to default '{app_config.DEFAULT_ADMIN_PASSWORD}'.")
         return
 
-    force_sim = args.simulator or os.environ.get("SDR_FORCE_SIMULATOR", "").lower() in ["1", "true", "yes"]
-
     print(f"==================================================")
     print(f"       SDR-Recorder NVR Server Starting           ")
     print(f"==================================================")
     print(f" Binding Address  : http://{args.host}:{args.port}")
-    print(f" Simulator Mode   : {force_sim}")
     print(f" Frontend Dist    : {Path(__file__).resolve().parent.parent / 'frontend' / 'dist'}")
     print(f" Default Login    : admin / 12345")
     print(f"==================================================")
 
     if args.reload:
-        if force_sim:
-            os.environ["SDR_FORCE_SIMULATOR"] = "1"
         uvicorn.run(
             "backend.run:create_app_factory",
             factory=True,
@@ -106,7 +99,7 @@ def main():
             log_level="info",
         )
     else:
-        app = build_app(force_simulator=force_sim)
+        app = build_app()
         uvicorn.run(
             app,
             host=args.host,

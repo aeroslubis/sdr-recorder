@@ -23,7 +23,7 @@ def _get_receiver(request: Request):
 
 @router.get("/devices")
 def list_available_devices() -> List[Dict[str, Any]]:
-    """Enumerate attached RTL-SDR USB dongles or return simulator."""
+    """Enumerate attached RTL-SDR USB dongles."""
     from backend.sdr.receiver import get_available_devices
     return get_available_devices()
 
@@ -39,8 +39,7 @@ def get_radio_status(request: Request, db: sqlite3.Connection = Depends(get_db))
     receiver = _get_receiver(request)
     if receiver:
         cfg = receiver.config.to_dict()
-        cfg["is_simulator"] = receiver.is_simulator
-        cfg["hardware_connected"] = getattr(receiver, "is_hardware_connected", not receiver.is_simulator)
+        cfg["hardware_connected"] = receiver.is_hardware_connected
         cfg["is_running"] = receiver.is_running
         cfg["last_rssi"] = receiver.last_rssi
         cfg["squelch_state"] = (
@@ -49,12 +48,35 @@ def get_radio_status(request: Request, db: sqlite3.Connection = Depends(get_db))
         return cfg
 
     # Fallback to DB configuration if receiver is not attached
-    db_config["is_simulator"] = True
     db_config["hardware_connected"] = False
     db_config["is_running"] = False
     db_config["last_rssi"] = -100.0
     db_config["squelch_state"] = "closed"
     return db_config
+
+
+@router.post("/auto-squelch")
+async def auto_squelch_calibrate(
+    request: Request,
+    db: sqlite3.Connection = Depends(get_db),
+) -> Dict[str, Any]:
+    """Automatically probe active frequency on RTL-SDR dongle to find optimal squelch."""
+    receiver = _get_receiver(request)
+    if not receiver or not receiver.is_hardware_connected:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Hardware RTL-SDR dongle not connected",
+        )
+    result = await receiver.calibrate_auto_squelch()
+
+    cursor = db.cursor()
+    cursor.execute(
+        "UPDATE radio_config SET squelch_threshold = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1",
+        (result["squelch_threshold"],),
+    )
+    db.commit()
+
+    return result
 
 
 @router.post("/tune")

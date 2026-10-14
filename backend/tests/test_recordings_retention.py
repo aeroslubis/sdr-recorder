@@ -209,7 +209,7 @@ def test_audio_writer_saves_transmission(tmp_path):
 @pytest.fixture
 def api_client(tmp_path):
     test_db = str(tmp_path / "test_api_rec.db")
-    app = create_app(db_path=test_db, force_simulator=True, test_mode=True)
+    app = create_app(db_path=test_db, test_mode=True)
     with TestClient(app) as client:
         # Authenticate admin user
         login_resp = client.post("/api/auth/login", json={"username": "admin", "password": "12345"})

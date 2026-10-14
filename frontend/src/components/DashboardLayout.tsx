@@ -319,22 +319,30 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
     } catch {}
   };
 
-  // Toggle Auto Squelch mode: computes optimal threshold ~6 dBFS above current noise floor
+  // Toggle Auto Squelch mode: triggers hardware calibration probe on active frequency
   const handleToggleAutoSquelch = async () => {
     const nextAuto = !isAutoSquelch;
     setIsAutoSquelch(nextAuto);
     if (nextAuto) {
-      // Calculate optimal squelch threshold above RF noise floor, clamped between -85 and -15 dBFS
-      const optimal = Math.min(-15.0, Math.max(-85.0, Math.round((liveRssi + 6.0) * 10) / 10));
-      setSquelchThreshold(optimal);
-      savedAutoSquelchRef.current = optimal;
       try {
-        await authFetch('/api/radio/tune', {
+        const res = await authFetch('/api/radio/auto-squelch', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ squelch_threshold: optimal }),
         });
-      } catch {}
+        if (res.ok) {
+          const data = await res.json();
+          if (data.squelch_threshold !== undefined) {
+            setSquelchThreshold(data.squelch_threshold);
+            savedAutoSquelchRef.current = data.squelch_threshold;
+          }
+        } else {
+          const optimal = Math.min(-15.0, Math.max(-85.0, Math.round((liveRssi + 6.0) * 10) / 10));
+          setSquelchThreshold(optimal);
+          savedAutoSquelchRef.current = optimal;
+        }
+      } catch {
+        const optimal = Math.min(-15.0, Math.max(-85.0, Math.round((liveRssi + 6.0) * 10) / 10));
+        setSquelchThreshold(optimal);
+      }
     }
   };
 

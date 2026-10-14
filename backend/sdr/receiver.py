@@ -1,8 +1,9 @@
-"""SDR Ingest Engine managing RTL-SDR subprocess or Mock SDR Simulator fallback."""
+"""SDR Ingest Engine managing RTL-SDR subprocess for SDR-Recorder NVR."""
 import asyncio
 import inspect
 import logging
 import re
+import select
 import shutil
 import subprocess
 import time
@@ -12,7 +13,6 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from backend.dsp.squelch import SquelchEvaluator, SquelchResult, SquelchState
 from backend.sdr.dongle_config import DongleConfig
-from backend.sdr.simulator import MockSDRSimulator
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +80,42 @@ def get_available_devices() -> List[Dict[str, Any]]:
     return devices
 
 
+def probe_squelch_level(freq_hz: int, mod: str = "fm", device_index: int = 0) -> int:
+    """
+    Directly probes connected RTL-SDR dongle to find the exact squelch point where
+    background noise floor is muted + safety margin (+25).
+    """
+    freq_str = f"{freq_hz / 1e6:.4f}M"
+    mod_arg = "fm" if mod.lower() in ["nfm", "fm"] else mod.lower()
+    low = 20
+    high = 800
+    best = 400
+    for _ in range(5):
+        mid = (low + high) // 2
+        cmd = [
+            "rtl_fm",
+            "-f", freq_str,
+            "-M", mod_arg,
+            "-s", "24k",
+            "-d", str(device_index),
+            "-l", str(mid),
+            "-",
+        ]
+        try:
+            p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+            time.sleep(0.35)
+            r, _, _ = select.select([p.stdout], [], [], 0.25)
+            p.terminate()
+            p.wait(timeout=0.5)
+            if r:
+                low = mid + 1
+            else:
+                best = mid
+                high = mid - 1
+        except Exception:
+            pass
+    return max(10, min(1000, best + 25))
+
 
 @dataclass
 class TransmissionEvent:
@@ -114,7 +150,7 @@ class TransmissionEvent:
 
 class SDRReceiver:
     """
-    Orchestrates real-time audio ingestion from RTL-SDR hardware or MockSDRSimulator.
+    Orchestrates real-time audio ingestion from RTL-SDR hardware.
     Processes audio through SquelchEvaluator and dispatches chunk & transmission callbacks.
     """
 
@@ -123,18 +159,19 @@ class SDRReceiver:
         config: Optional[DongleConfig] = None,
         on_chunk_callback: Optional[Callable] = None,
         on_transmission_end_callback: Optional[Callable] = None,
-        force_simulator: bool = False,
         sample_rate: int = 24000,
         chunk_ms: int = 50,
     ):
         self.config = config or DongleConfig()
         self.on_chunk_callback = on_chunk_callback
         self.on_transmission_end_callback = on_transmission_end_callback
-        self.force_simulator = force_simulator
 
         self.sample_rate = int(sample_rate)
         self.chunk_ms = int(chunk_ms)
         self.chunk_bytes = int(self.sample_rate * (self.chunk_ms / 1000.0) * 2)
+
+        # Active hardware squelch level override if calibrated
+        self._active_squelch_l: Optional[int] = None
 
         # Initialize DSP Squelch Evaluator
         self.squelch_evaluator = SquelchEvaluator(
@@ -164,10 +201,6 @@ class SDRReceiver:
         return self._running
 
     @property
-    def is_simulator(self) -> bool:
-        return False
-
-    @property
     def is_hardware_connected(self) -> bool:
         return self._is_hardware_connected
 
@@ -178,6 +211,50 @@ class SDRReceiver:
     @property
     def last_rssi(self) -> float:
         return self._last_rssi
+
+    async def calibrate_auto_squelch(self) -> Dict[str, Any]:
+        """
+        Dynamically probes connected RTL-SDR hardware on active frequency
+        to find the exact squelch point that mutes background noise floor.
+        Applies and restarts receiver with optimal squelch.
+        """
+        was_running = self._running
+        if self._process:
+            try:
+                self._process.terminate()
+                await asyncio.wait_for(self._process.wait(), timeout=1.0)
+            except Exception:
+                try:
+                    self._process.kill()
+                except Exception:
+                    pass
+            self._process = None
+            await asyncio.sleep(0.15)
+
+        # Run probe in background thread to avoid blocking asyncio event loop
+        best_l = await asyncio.to_thread(
+            probe_squelch_level,
+            self.config.frequency_hz,
+            self.config.modulation,
+            self.config.device_index,
+        )
+
+        optimal_dbfs = round((best_l / 7.0) - 100.0, 1)
+        optimal_dbfs = max(-85.0, min(-15.0, optimal_dbfs))
+
+        self._active_squelch_l = best_l
+        self.config.squelch_threshold = optimal_dbfs
+        self.squelch_evaluator.threshold_dbfs = optimal_dbfs
+
+        if was_running:
+            await self.start()
+
+        return {
+            "squelch_threshold": optimal_dbfs,
+            "squelch_l": best_l,
+            "frequency_hz": self.config.frequency_hz,
+            "modulation": self.config.modulation,
+        }
 
     def build_rtl_fm_command(self) -> List[str]:
         """Constructs the command line invocation for rtl_fm."""
@@ -192,14 +269,14 @@ class SDRReceiver:
             mod_arg = "am"
 
         # Determine squelch parameter for rtl_fm:
-        # In FM mode, discriminator noise without squelch is ~9000 RMS (-11 dBFS).
-        # We map squelch_threshold (-100 to 0 dBFS) to rtl_fm -l level.
         if mod_arg in ["fm", "wbfm"]:
             if self.config.squelch_threshold <= -95.0:
                 squelch_l = "0"
+            elif self._active_squelch_l is not None:
+                squelch_l = str(self._active_squelch_l)
             else:
-                # Maps -90..0 dBFS to rtl_fm squelch level (e.g. -50 dBFS -> 70, -42 dBFS -> 81)
-                l_val = max(1, min(300, int((self.config.squelch_threshold + 100.0) * 1.4)))
+                # Maps squelch_threshold dBFS (-90 to 0) to rtl_fm squelch level (up to 1000)
+                l_val = max(1, min(1000, int((self.config.squelch_threshold + 100.0) * 7.0)))
                 squelch_l = str(l_val)
         else:
             squelch_l = "0"
@@ -473,14 +550,20 @@ class SDRReceiver:
             or new_config.bias_tee != self.config.bias_tee
             or new_config.direct_sampling != self.config.direct_sampling
             or new_config.device_index != self.config.device_index
+            or new_config.squelch_threshold != self.config.squelch_threshold
         )
+
+        if new_config.frequency_hz != self.config.frequency_hz:
+            self._active_squelch_l = None
+        elif new_config.squelch_threshold != self.config.squelch_threshold:
+            self._active_squelch_l = max(1, min(1000, int((new_config.squelch_threshold + 100.0) * 7.0)))
 
         self.config = new_config
         self.squelch_evaluator.threshold_dbfs = new_config.squelch_threshold
         self.squelch_evaluator.hang_time_ms = new_config.hang_time_ms
         self.squelch_evaluator.pre_roll_ms = new_config.pre_roll_ms
 
-        if rf_changed and self._running and not self.is_simulator:
+        if rf_changed and self._running:
             await self.restart()
 
     async def __aenter__(self) -> "SDRReceiver":

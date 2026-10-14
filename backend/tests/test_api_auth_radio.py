@@ -8,7 +8,7 @@ from backend.main import create_app
 @pytest.fixture
 def client(tmp_path):
     test_db = str(tmp_path / "test_api.db")
-    app = create_app(db_path=test_db, force_simulator=True, test_mode=True)
+    app = create_app(db_path=test_db, test_mode=True)
     with TestClient(app) as test_client:
         yield test_client
 
@@ -40,7 +40,7 @@ def test_login_success_and_failure(client):
     assert "frequency_hz" in status_data
     assert "modulation" in status_data
     assert "squelch_threshold" in status_data
-    assert "is_simulator" in status_data
+    assert "hardware_connected" in status_data
 
 
 def test_auth_me_and_logout(client):
@@ -216,3 +216,24 @@ def test_radio_presets_crud(client):
     # Delete again -> 404
     del_resp404 = client.delete(f"/api/radio/presets/{preset_id}", headers=headers)
     assert del_resp404.status_code == 404
+
+
+def test_auto_squelch_endpoint(client):
+    login_resp = client.post("/api/auth/login", json={"username": "admin", "password": "12345"})
+    token = login_resp.json()["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    from unittest.mock import patch, AsyncMock
+    with patch("backend.sdr.receiver.is_hardware_available", return_value=True):
+        with patch.object(
+            client.app.state.receiver,
+            "calibrate_auto_squelch",
+            new_callable=AsyncMock,
+            return_value={"squelch_threshold": -45.0, "squelch_l": 385, "frequency_hz": 144500000, "modulation": "NFM"},
+        ):
+            client.app.state.receiver._is_hardware_connected = True
+            resp = client.post("/api/radio/auto-squelch", headers=headers)
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["squelch_threshold"] == -45.0
+            assert data["squelch_l"] == 385
