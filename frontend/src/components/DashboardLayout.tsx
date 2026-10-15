@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { TopBar } from './TopBar';
 import { RadioTuningPanel, PresetItem } from './RadioTuningPanel';
@@ -81,6 +81,10 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
   const wsRef = useRef<WebSocket | null>(null);
 
   const selectedIntervalRef = useRef<TransmissionInterval | null>(null);
+  const chronologicalCallsRef = useRef<CallLogItem[]>([]);
+  const selectedCallIdRef = useRef<number | null>(null);
+  const isContinuousPlayRef = useRef<boolean>(false);
+  const handlePlayCallRef = useRef<((id: number) => Promise<void>) | null>(null);
 
   // Initialize WebAudioPlayer
   useEffect(() => {
@@ -98,6 +102,17 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
     };
 
     player.onEnded = () => {
+      if (isContinuousPlayRef.current) {
+        const sorted = chronologicalCallsRef.current;
+        const currId = selectedCallIdRef.current;
+        const currIdx = sorted.findIndex((c) => c.id === currId);
+        if (currIdx >= 0 && currIdx < sorted.length - 1) {
+          const nextCall = sorted[currIdx + 1];
+          handlePlayCallRef.current?.(nextCall.id);
+          return;
+        }
+      }
+      isContinuousPlayRef.current = false;
       setIsPlaying(false);
     };
 
@@ -468,6 +483,23 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
     }
   };
 
+  // Chronological calls (ascending order of start_time)
+  const chronologicalCalls = useMemo(() => {
+    return [...calls].sort((a, b) => {
+      const timeA = a.startTime || a.start_time || '';
+      const timeB = b.startTime || b.start_time || '';
+      return timeA.localeCompare(timeB);
+    });
+  }, [calls]);
+
+  useEffect(() => {
+    chronologicalCallsRef.current = chronologicalCalls;
+  }, [chronologicalCalls]);
+
+  useEffect(() => {
+    selectedCallIdRef.current = selectedCallId;
+  }, [selectedCallId]);
+
   const handlePlayCall = async (id: number) => {
     handleSelectTransmission(id);
     const authToken = token || localStorage.getItem('sdr_auth_token') || sessionStorage.getItem('sdr_auth_token') || '';
@@ -479,40 +511,56 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
     }
   };
 
+  useEffect(() => {
+    handlePlayCallRef.current = handlePlayCall;
+  });
+
+  const handleStopPlayback = () => {
+    isContinuousPlayRef.current = false;
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.stop();
+    }
+    setIsPlaying(false);
+  };
+
   const handlePlayPause = async () => {
     if (!audioPlayerRef.current) return;
     if (isPlaying) {
+      isContinuousPlayRef.current = false;
       audioPlayerRef.current.pause();
     } else {
+      isContinuousPlayRef.current = true;
       if (selectedCallId) {
         const authToken = token || localStorage.getItem('sdr_auth_token') || sessionStorage.getItem('sdr_auth_token') || '';
         const audioUrl = `/api/recordings/${selectedCallId}/audio${authToken ? `?token=${encodeURIComponent(authToken)}` : ''}`;
         try {
           await audioPlayerRef.current.playUrl(audioUrl);
         } catch {}
-      } else if (calls.length > 0) {
-        handlePlayCall(calls[0].id);
+      } else if (chronologicalCalls.length > 0) {
+        handlePlayCall(chronologicalCalls[0].id);
       }
     }
   };
 
   const handlePrevCall = () => {
-    if (!calls.length) return;
-    const currentIndex = calls.findIndex((c) => c.id === selectedCallId);
+    if (!chronologicalCalls.length) return;
+    const currentIndex = chronologicalCalls.findIndex((c) => c.id === selectedCallId);
     if (currentIndex > 0) {
-      handlePlayCall(calls[currentIndex - 1].id);
+      handlePlayCall(chronologicalCalls[currentIndex - 1].id);
     } else {
-      handlePlayCall(calls[0].id);
+      handlePlayCall(chronologicalCalls[0].id);
     }
   };
 
   const handleNextCall = () => {
-    if (!calls.length) return;
-    const currentIndex = calls.findIndex((c) => c.id === selectedCallId);
-    if (currentIndex >= 0 && currentIndex < calls.length - 1) {
-      handlePlayCall(calls[currentIndex + 1].id);
-    } else if (calls.length > 0) {
-      handlePlayCall(calls[calls.length - 1].id);
+    if (!chronologicalCalls.length) return;
+    const currentIndex = chronologicalCalls.findIndex((c) => c.id === selectedCallId);
+    if (currentIndex >= 0 && currentIndex < chronologicalCalls.length - 1) {
+      handlePlayCall(chronologicalCalls[currentIndex + 1].id);
+    } else if (currentIndex < 0) {
+      handlePlayCall(chronologicalCalls[0].id);
+    } else if (chronologicalCalls.length > 0) {
+      handlePlayCall(chronologicalCalls[chronologicalCalls.length - 1].id);
     }
   };
 
@@ -691,7 +739,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
       {/* 2. Responsive 3-Column Dashboard Body */}
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden">
         {/* Left Column: Radio Tuning Panel (300px) */}
-        <div className="w-full lg:w-72 xl:w-80 shrink-0 bg-obsidian/40 overflow-y-auto h-full min-h-0">
+        <div className="w-full lg:w-72 xl:w-80 shrink-0 border-r border-charcoal bg-obsidian/40 overflow-y-auto h-full min-h-0">
           <RadioTuningPanel
             frequencyHz={frequencyHz}
             modulation={modulation}
@@ -795,6 +843,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
             onDateChange={setSelectedDate}
             activeDates={activeDates}
             onPlay={(call) => handlePlayCall(call.id)}
+            onStop={handleStopPlayback}
             onToggleStar={handleToggleStar}
             onSelectCall={handleSelectTransmission}
             onDownload={handleExportClip}

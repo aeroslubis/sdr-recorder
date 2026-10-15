@@ -3,6 +3,7 @@ import {
   Search,
   Star,
   Play,
+  Square,
   Download,
   Calendar,
   Radio,
@@ -33,6 +34,7 @@ export interface CallLogPanelProps {
   selectedCallId?: number | null;
   playingCallId?: number | null;
   onPlay?: (call: CallLogItem) => void;
+  onStop?: () => void;
   onToggleStar?: (callId: number, nextStarred: boolean) => void;
   onDownload?: (callId: number) => void;
   onSelectCall?: (callId: number) => void;
@@ -77,6 +79,7 @@ export const CallLogPanel: React.FC<CallLogPanelProps> = ({
   selectedCallId = null,
   playingCallId = null,
   onPlay,
+  onStop,
   onToggleStar,
   onDownload,
   onSelectCall,
@@ -269,23 +272,34 @@ export const CallLogPanel: React.FC<CallLogPanelProps> = ({
                       />
                     </button>
 
-                    {/* Quick Play Button */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onPlay?.(call);
-                      }}
-                      aria-label="Play Call"
-                      title="Quick Play"
-                      className={`p-1 rounded-pill transition-colors cursor-pointer ${
-                        isPlaying
-                          ? 'bg-phosphor-green text-obsidian'
-                          : 'hover:bg-obsidian text-silver-mist hover:text-phosphor-green'
-                      }`}
-                    >
-                      <Play className="w-3.5 h-3.5 fill-current" />
-                    </button>
+                    {/* Quick Play/Stop Button */}
+                    {isPlaying ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onStop?.();
+                        }}
+                        aria-label="Stop Call"
+                        title="Stop Playback"
+                        className="p-1 rounded-pill transition-colors cursor-pointer bg-phosphor-green text-obsidian hover:bg-red-500 hover:text-snow"
+                      >
+                        <Square className="w-3.5 h-3.5 fill-current" />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onPlay?.(call);
+                        }}
+                        aria-label="Play Call"
+                        title="Quick Play"
+                        className="p-1 rounded-pill transition-colors cursor-pointer hover:bg-obsidian text-silver-mist hover:text-phosphor-green"
+                      >
+                        <Play className="w-3.5 h-3.5 fill-current" />
+                      </button>
+                    )}
 
                     {/* Download Button */}
                     <button

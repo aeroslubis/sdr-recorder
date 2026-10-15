@@ -94,6 +94,29 @@ describe('CallLogPanel Component', () => {
     expect(handleToggleStar).toHaveBeenCalledWith(2, true);
   });
 
+  test('renders stop button for actively playing call and triggers onStop callback', () => {
+    const handleStop = jest.fn();
+
+    render(
+      <CallLogPanel
+        calls={sampleCalls}
+        playingCallId={1}
+        onStop={handleStop}
+      />
+    );
+
+    // Call 1 is playing, so it should render a Stop Call button
+    const stopButton = screen.getByRole('button', { name: /stop call/i });
+    expect(stopButton).toBeInTheDocument();
+
+    fireEvent.click(stopButton);
+    expect(handleStop).toHaveBeenCalledTimes(1);
+
+    // Call 2 and Call 3 should still have Play Call buttons
+    const playButtons = screen.getAllByRole('button', { name: /play call/i });
+    expect(playButtons.length).toBe(2);
+  });
+
   test('displays empty state when no calls match criteria', () => {
     render(<CallLogPanel calls={[]} onPlay={jest.fn()} onToggleStar={jest.fn()} />);
     expect(screen.getByText(/no transmissions found/i)).toBeInTheDocument();
