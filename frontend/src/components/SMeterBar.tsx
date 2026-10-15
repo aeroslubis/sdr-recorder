@@ -99,7 +99,7 @@ export const SMeterBar: React.FC<SMeterBarProps> = ({
         }`}
         title={
           disabled
-            ? `Squelch AUTO aktif (${clampedThreshold.toFixed(1)} dBFS terkunci). Matikan SQL AUTO untuk menggeser manual.`
+            ? `Auto Squelch active (${clampedThreshold.toFixed(1)} dBFS locked). Disable SQL AUTO to adjust manually.`
             : `Click or drag to set squelch threshold (currently ${clampedThreshold.toFixed(1)} dBFS)`
         }
         role="slider"

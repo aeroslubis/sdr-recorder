@@ -205,8 +205,8 @@ export const RadioTuningPanel: React.FC<RadioTuningPanelProps> = ({
               aria-label="Auto Squelch Toggle"
               title={
                 isAutoSquelch
-                  ? 'Auto Squelch aktif (slider terkunci). Klik untuk beralih ke Manual.'
-                  : 'Klik untuk mengaktifkan Auto Squelch (mencari titik squelch optimal).'
+                  ? 'Auto Squelch active (slider locked). Click to switch to Manual.'
+                  : 'Click to enable Auto Squelch (automatically locks threshold above noise floor).'
               }
               className={`flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-inputs border text-[11px] font-mono transition-colors cursor-pointer ${
                 isAutoSquelch

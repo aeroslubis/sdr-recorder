@@ -36,7 +36,7 @@ export const NoDeviceModal: React.FC<NoDeviceModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Tutup Peringatan"
+            aria-label="Close Alert"
             className="absolute top-4 right-4 text-smoke hover:text-snow p-1 rounded-pill hover:bg-obsidian transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
@@ -51,10 +51,10 @@ export const NoDeviceModal: React.FC<NoDeviceModalProps> = ({
 
           <div className="flex-1">
             <h3 id="no-device-title" className="text-base font-semibold text-snow">
-              Tidak Ada Perangkat SDR Terhubung
+              No SDR Hardware Device Connected
             </h3>
             <p className="text-xs font-mono text-red-400 font-medium mt-0.5">
-              [●] RECORDING RADIO STOPPED · PERANGKAT OFFLINE
+              [●] RADIO RECORDING STOPPED · HARDWARE OFFLINE
             </p>
           </div>
         </div>
@@ -62,23 +62,22 @@ export const NoDeviceModal: React.FC<NoDeviceModalProps> = ({
         {/* Description Body */}
         <div id="no-device-desc" className="text-xs text-silver-mist space-y-2.5">
           <p>
-            Hardware dongle <span className="text-snow font-mono font-medium">RTL-SDR USB</span> tidak
-            terdeteksi pada port komputer. Seluruh proses perekaman frekuensi radio dihentikan secara
-            otomatis agar tidak menghasilkan data audio kosong.
+            The <span className="text-snow font-mono font-medium">RTL-SDR USB</span> dongle hardware
+            was not detected on the computer port. All radio frequency recording processes are halted
+            automatically to avoid generating empty audio files.
           </p>
 
           <div className="bg-obsidian/90 border border-charcoal rounded-inputs p-3 space-y-1.5 font-mono text-[11px]">
             <div className="flex items-center gap-2 text-red-400">
               <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-ping" />
-              <span>Status Perekaman: DINONAKTIFKAN (TIDAK ADA HARDWARE)</span>
+              <span>Recording Status: HALTED (NO HARDWARE)</span>
             </div>
             <div className="flex items-center gap-2 text-smoke">
               <Radio className="w-3.5 h-3.5 text-smoke" />
-              <span>Spektrum: FLAT (Tidak menerima sinyal RF)</span>
+              <span>Spectrum: FLAT (No RF signal received)</span>
             </div>
             <div className="text-smoke pt-1 border-t border-charcoal">
-              Pastikan kabel USB RTL-SDR terpasang erat. Sistem secara otomatis mendeteksi dan
-              melanjutkan recording begitu dongle terpasang kembali.
+              Please ensure the RTL-SDR USB dongle is securely plugged in. The system will automatically detect the device and resume recording once reconnected.
             </div>
           </div>
         </div>
@@ -92,7 +91,7 @@ export const NoDeviceModal: React.FC<NoDeviceModalProps> = ({
               className="flex items-center gap-1.5 px-3 py-2 rounded-pill bg-obsidian border border-charcoal hover:border-slate text-silver-mist hover:text-snow text-xs font-mono transition-colors cursor-pointer"
             >
               <Settings className="w-3.5 h-3.5" />
-              <span>Konfigurasi Dongle</span>
+              <span>Dongle Configuration</span>
             </button>
           )}
 
@@ -103,7 +102,7 @@ export const NoDeviceModal: React.FC<NoDeviceModalProps> = ({
               className="flex items-center gap-1.5 px-4 py-2 rounded-pill bg-phosphor-green hover:bg-mint-pulse text-obsidian text-xs font-medium font-mono transition-colors cursor-pointer font-semibold shadow-sm"
             >
               <RefreshCw className="w-3.5 h-3.5" />
-              <span>Cek Ulang Perangkat</span>
+              <span>Retry Device Detection</span>
             </button>
           )}
         </div>

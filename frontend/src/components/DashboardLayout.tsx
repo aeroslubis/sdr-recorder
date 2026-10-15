@@ -73,6 +73,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
     max_disk_usage_percent: 90,
     audio_format: 'opus',
   });
+  const [diskUsedGB, setDiskUsedGB] = useState<number>(0);
+  const [diskTotalGB, setDiskTotalGB] = useState<number>(0);
 
   // Audio player ref
   const audioPlayerRef = useRef<WebAudioPlayer | null>(null);
@@ -134,6 +136,24 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
     },
     [token]
   );
+
+  // Storage Stats Fetcher
+  const fetchStorageStats = useCallback(() => {
+    authFetch('/api/system/stats')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.storage) {
+          const used = data.storage.used_gb ?? (data.storage.used_bytes ? data.storage.used_bytes / (1024 ** 3) : 0);
+          const total = data.storage.total_gb ?? (data.storage.total_bytes ? data.storage.total_bytes / (1024 ** 3) : 0);
+          setDiskUsedGB(Math.round(used * 10) / 10);
+          setDiskTotalGB(Math.round(total * 10) / 10);
+        }
+        if (typeof data?.hardware_connected === 'boolean') {
+          setHardwareConnected(data.hardware_connected);
+        }
+      })
+      .catch(() => {});
+  }, [authFetch]);
 
   // Resume Web AudioContext on first user interaction to satisfy browser autoplay policy
   useEffect(() => {
@@ -211,6 +231,13 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
       })
       .catch(() => {});
   }, [authFetch]);
+
+  // Fetch real-time storage stats on mount and poll periodically (every 30s)
+  useEffect(() => {
+    fetchStorageStats();
+    const interval = setInterval(fetchStorageStats, 30000);
+    return () => clearInterval(interval);
+  }, [fetchStorageStats]);
 
   // Clock ticker every second
   useEffect(() => {
@@ -607,6 +634,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
       if (res.ok) {
         const data = await res.json();
         setStorageSettings(data);
+        fetchStorageStats();
       }
     } catch {}
   };
@@ -648,6 +676,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
         frequencyHz={frequencyHz}
         modulation={modulation}
         hardwareConnected={hardwareConnected}
+        diskUsedGB={diskUsedGB}
+        diskTotalGB={diskTotalGB}
         username={user?.username || 'admin'}
         serverTime={serverTimeStr}
         serverTimezone={serverTzStr}
@@ -788,6 +818,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
           ppm_offset: ppmOffset,
         }}
         initialStorageSettings={storageSettings}
+        diskUsedGB={diskUsedGB}
+        diskTotalGB={diskTotalGB}
       />
 
       {/* Warning Popup when No SDR Dongle is Connected */}

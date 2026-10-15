@@ -16,25 +16,25 @@ describe('NoDeviceModal', () => {
       />
     );
 
-    expect(screen.getByText(/Tidak Ada Perangkat SDR Terhubung/i)).toBeInTheDocument();
-    expect(screen.getByText(/RECORDING RADIO STOPPED/i)).toBeInTheDocument();
-    expect(screen.getByText(/DINONAKTIFKAN/i)).toBeInTheDocument();
+    expect(screen.getByText(/No SDR Hardware Device Connected/i)).toBeInTheDocument();
+    expect(screen.getByText(/RADIO RECORDING STOPPED/i)).toBeInTheDocument();
+    expect(screen.getByText(/HALTED \(NO HARDWARE\)/i)).toBeInTheDocument();
 
-    const retryBtn = screen.getByRole('button', { name: /Cek Ulang Perangkat/i });
+    const retryBtn = screen.getByRole('button', { name: /Retry Device Detection/i });
     fireEvent.click(retryBtn);
     expect(handleRetry).toHaveBeenCalledTimes(1);
 
-    const settingsBtn = screen.getByRole('button', { name: /Konfigurasi Dongle/i });
+    const settingsBtn = screen.getByRole('button', { name: /Dongle Configuration/i });
     fireEvent.click(settingsBtn);
     expect(handleOpenSettings).toHaveBeenCalledTimes(1);
 
-    const closeBtn = screen.getByRole('button', { name: /Tutup Peringatan/i });
+    const closeBtn = screen.getByRole('button', { name: /Close Alert/i });
     fireEvent.click(closeBtn);
     expect(handleClose).toHaveBeenCalledTimes(1);
   });
 
   test('does not render when isOpen is false', () => {
     render(<NoDeviceModal isOpen={false} />);
-    expect(screen.queryByText(/Tidak Ada Perangkat SDR Terhubung/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/No SDR Hardware Device Connected/i)).not.toBeInTheDocument();
   });
 });

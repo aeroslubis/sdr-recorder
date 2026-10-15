@@ -71,6 +71,9 @@ def _get_storage_info() -> Dict[str, Any]:
             "total_bytes": usage.total,
             "used_bytes": usage.used,
             "free_bytes": usage.free,
+            "total_gb": round(usage.total / (1024 ** 3), 1),
+            "used_gb": round(usage.used / (1024 ** 3), 1),
+            "free_gb": round(usage.free / (1024 ** 3), 1),
             "percent": percent,
         }
     except Exception:
@@ -78,6 +81,9 @@ def _get_storage_info() -> Dict[str, Any]:
             "total_bytes": 0,
             "used_bytes": 0,
             "free_bytes": 0,
+            "total_gb": 0.0,
+            "used_gb": 0.0,
+            "free_gb": 0.0,
             "percent": 0.0,
         }
 
