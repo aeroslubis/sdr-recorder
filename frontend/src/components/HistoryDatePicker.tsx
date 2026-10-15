@@ -58,7 +58,10 @@ export const HistoryDatePicker: React.FC<HistoryDatePickerProps> = ({
     let isMounted = true;
     const monthStr = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}`;
 
-    const token = localStorage.getItem('sdr_auth_token') || sessionStorage.getItem('sdr_auth_token');
+    const token =
+      (typeof window !== 'undefined' && window.localStorage?.getItem?.('sdr_auth_token')) ||
+      (typeof window !== 'undefined' && window.sessionStorage?.getItem?.('sdr_auth_token')) ||
+      '';
     const headers: Record<string, string> = {};
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;

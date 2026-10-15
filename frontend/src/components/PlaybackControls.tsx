@@ -47,11 +47,11 @@ export const PlaybackControls: React.FC<PlaybackControlsProps> = ({
 }) => {
   return (
     <div
-      className={`bg-ash/90 backdrop-blur border border-charcoal rounded-cards px-4 py-3 flex flex-wrap items-center justify-between gap-4 select-none ${className}`}
+      className={`bg-ash/90 backdrop-blur border border-charcoal rounded-cards px-3 sm:px-4 py-2 sm:py-3 flex flex-wrap items-center justify-between gap-2.5 sm:gap-4 select-none ${className}`}
       aria-label="Audio Playback Controls"
     >
       {/* Left: Transport buttons */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 min-w-0">
         <button
           type="button"
           onClick={onPrevCall}
@@ -95,8 +95,9 @@ export const PlaybackControls: React.FC<PlaybackControlsProps> = ({
         </button>
 
         {activeCallTitle && (
-          <div className="hidden lg:flex items-center text-xs text-smoke font-mono ml-2 border-l border-charcoal pl-3">
-            Active: <span className="text-silver-mist ml-1 font-semibold">{activeCallTitle}</span>
+          <div className="flex items-center text-xs text-smoke font-mono ml-1 sm:ml-2 border-l border-charcoal pl-2 sm:pl-3 truncate max-w-[130px] sm:max-w-none">
+            <span className="hidden sm:inline">Active:</span>
+            <span className="text-silver-mist ml-1 font-semibold truncate">{activeCallTitle}</span>
           </div>
         )}
       </div>

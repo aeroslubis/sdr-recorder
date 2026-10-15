@@ -73,25 +73,25 @@ export const TopBar: React.FC<TopBarProps> = ({
 
   return (
     <header
-      className={`h-16 bg-obsidian border-b border-charcoal px-6 flex items-center justify-between select-none ${className}`}
+      className={`h-14 sm:h-16 bg-obsidian border-b border-charcoal px-3 sm:px-6 flex items-center justify-between select-none ${className}`}
       aria-label="Application Header"
     >
       {/* Brand & Active Frequency Badge */}
-      <div className="flex items-center gap-6">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-full bg-ash border border-charcoal flex items-center justify-center">
-            <Radio className="w-4 h-4 text-phosphor-green animate-pulse" />
+      <div className="flex items-center gap-3 sm:gap-6 min-w-0">
+        <div className="flex items-center gap-2 sm:gap-2.5">
+          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-ash border border-charcoal flex items-center justify-center shrink-0">
+            <Radio className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-phosphor-green animate-pulse" />
           </div>
-          <span className="font-medium text-snow text-lg tracking-tight">
+          <span className="font-medium text-snow text-sm sm:text-lg tracking-tight truncate">
             [●] SDR RECORDER
           </span>
         </div>
       </div>
 
       {/* Center / Right System Metrics */}
-      <div className="flex items-center gap-5">
+      <div className="flex items-center gap-2 sm:gap-5 shrink-0">
         {/* Hardware Status Pill */}
-        <div className="flex items-center gap-1.5 px-3 py-1 bg-ash border border-charcoal rounded-pill text-xs font-mono">
+        <div className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 bg-ash border border-charcoal rounded-pill text-[11px] sm:text-xs font-mono">
           <div
             className={`w-2 h-2 rounded-full ${
               hardwareConnected ? 'bg-phosphor-green animate-pulse' : 'bg-red-400'

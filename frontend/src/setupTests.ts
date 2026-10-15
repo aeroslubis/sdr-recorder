@@ -126,4 +126,30 @@ HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined);
 HTMLMediaElement.prototype.pause = vi.fn();
 HTMLMediaElement.prototype.load = vi.fn();
 
+// Mock localStorage & sessionStorage for jsdom
+const createStorageMock = () => {
+  let store: Record<string, string> = {};
+  return {
+    getItem: vi.fn((key: string) => store[key] || null),
+    setItem: vi.fn((key: string, val: string) => {
+      store[key] = String(val);
+    }),
+    removeItem: vi.fn((key: string) => {
+      delete store[key];
+    }),
+    clear: vi.fn(() => {
+      store = {};
+    }),
+  };
+};
+
+Object.defineProperty(window, 'localStorage', {
+  value: createStorageMock(),
+  writable: true,
+});
+Object.defineProperty(window, 'sessionStorage', {
+  value: createStorageMock(),
+  writable: true,
+});
+
 
