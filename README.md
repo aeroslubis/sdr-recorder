@@ -30,8 +30,8 @@
 - [Quickstart Setup & Commands](#quickstart-setup--commands)
 - [Deploy to VPS with Docker](#deploy-to-vps-with-docker)
 - [Hardware SDR Configuration](#hardware-sdr-configuration)
+- [Hardware Detection & Disconnect Safeguards](#hardware-detection--disconnect-safeguards)
 - [24-Hour Timeline Scrubber & Continuous Playback](#24-hour-timeline-scrubber--continuous-playback)
-- [Mock SDR Simulator Mode](#mock-sdr-simulator-mode)
 - [Storage Auto-Retention Engine](#storage-auto-retention-engine)
 - [API Reference](#api-reference)
 - [Automated Testing](#automated-testing)
@@ -44,11 +44,12 @@ Traditional SDR tools either record continuous raw baseband IQ data (wasting gig
 
 ```
 +-----------------------------------------------------------------------------------+
-| RTL-SDR Dongle (USB) OR Mock SDR Simulator (Looping Radio WAV with RF noise floor) |
+| RTL-SDR Dongle (USB Hardware: RTL2832U / R820T2 / RTL-SDR Blog V3/V4)             |
+| [Continuous USB Health Monitoring & Automatic Disconnect Safeguard]                |
 +-----------------------------------------------------------------------------------+
                                          │
                                          ▼ Subprocess Pipe
-                         `rtl_fm -f <freq> -M <am|fm> -s 24k`
+                         `rtl_fm -d <idx> -f <freq> -M <am|fm> -s 24k`
                                          │ Raw PCM 16-bit 24kHz Mono (50ms chunks)
                                          ▼
 +-----------------------------------------------------------------------------------+
@@ -70,7 +71,12 @@ Traditional SDR tools either record continuous raw baseband IQ data (wasting gig
 |      - Reset Hang Time Counter to 800ms                                           |
 |      - Record transmission start_time & peak RSSI                                 |
 |    - Write current audio chunk to active file stream                              |
-|    - If Live Audio Listener is connected -> push audio chunk to WebSocket client  |
+|    - If Live Audio Monitor is active -> push audio chunk to WebSocket client      |
+|                                                                                   |
+|    [ Hardware Disconnect Event: USB Unplugged / Hardware Fault ]                  |
+|    - Immediately finalize & flush active transmission (prevents file corruption)   |
+|    - Broadcast hardware_connected = False & OFFLINE state to WebSocket clients   |
+|    - Client displays NoDeviceModal warning; background engine probes for reconnect|
 +-----------------------------------------------------------------------------------+
                                          │
                                          ▼ Finalized Transmission
@@ -80,7 +86,7 @@ Traditional SDR tools either record continuous raw baseband IQ data (wasting gig
 
 ### Core Architecture Components
 
-1. **RTL-SDR Subprocess Ingest Engine:** Reads 16-bit 24 kHz mono raw PCM audio stream from `rtl_fm`. Automatically falls back to internal Mock SDR Simulator when hardware is unplugged.
+1. **RTL-SDR Subprocess Ingest Engine:** Reads 16-bit 24 kHz mono raw PCM audio stream from `rtl_fm` using the configured USB dongle. Actively monitors USB device status and immediately halts recording upon disconnect to safeguard data integrity.
 2. **DSP Squelch Evaluator:** Evaluates signal root-mean-square (RMS) power in 50ms windows, converting to dBFS (-100 to 0 dBFS). Includes 1-click **Auto-Squelch** hardware noise calibration.
 3. **In-Memory Pre-Roll Ring Buffer:** Thread-safe circular buffer holding 500ms (configurable 100ms - 1000ms) of pre-squelch audio. When squelch opens, pre-roll audio is prepended to the recording to guarantee callsigns and initial syllables are never truncated.
 4. **Hang Time Tail Buffer:** Holds squelch open for 800ms after signal drops below threshold to avoid file fragmentation during natural speech pauses.
@@ -93,6 +99,7 @@ Traditional SDR tools either record continuous raw baseband IQ data (wasting gig
 
 - **Automated Squelch & Zero-Truncation Recording:** Discards dead air; indexes active transmissions into chronological call logs with pre-roll audio buffers.
 - **One-Click Auto-Squelch Calibration:** Automatically samples active channel noise floor and sets optimal squelch threshold (+6 dB above noise floor) with manual override anytime.
+- **Hardware Disconnect Safeguards:** Immediately stops recording upon USB unplugging or hardware failure, flags the system OFFLINE, and displays a warning prompt without crashing.
 - **Live SDR Spectrum Visualizer:** Real-time audio spectrum analyzer positioned directly above the timeline for immediate visual feedback of active radio traffic.
 - **24-Hour Zoomable Canvas Timeline Scrubber:** High-performance HTML5 Canvas renderer displaying 24-hour days with zoom presets (`24h`, `6h`, `1h`, `15m`), wheel zoom, playhead dragging, and Phosphor Green transmission blocks.
 - **Chronological Playback & Continuous Auto-Play:**
@@ -128,6 +135,7 @@ The system initializes an admin account upon first boot:
 - Python 3.11+
 - Node.js 18+ & npm
 - `rtl_fm` (from `rtl-sdr` package) and `ffmpeg`
+- Physical RTL-SDR USB dongle connected to the host
 
 ```bash
 # Ubuntu / Debian
@@ -153,7 +161,7 @@ sudo apt-get install -y rtl-sdr ffmpeg python3-venv nodejs npm
    ```bash
    # Terminal 1: Backend
    source .venv/bin/activate
-   python backend/run.py --reload --simulator
+   python backend/run.py --reload
 
    # Terminal 2: Frontend (Vite Dev Server)
    cd frontend
@@ -173,7 +181,7 @@ Ensure Docker and Docker Compose are installed:
 sudo apt-get update && sudo apt-get install -y docker.io docker-compose-v2
 ```
 
-*(Optional - if physical RTL-SDR dongle is plugged into VPS)*: Prevent the Linux kernel DVB-T driver from claiming the dongle:
+Prevent the Linux kernel DVB-T driver from claiming the RTL-SDR dongle:
 ```bash
 echo 'blacklist dvb_usb_rtl28xxu' | sudo tee /etc/modprobe.d/blacklist-rtlsdr.conf
 sudo rmmod dvb_usb_rtl28xxu 2>/dev/null || true
@@ -228,6 +236,21 @@ SDR-Recorder includes extensive hardware controls accessible via **`admin ▾` -
 
 ---
 
+## Hardware Detection & Disconnect Safeguards
+
+SDR-Recorder is purpose-built for physical RTL-SDR USB dongles (RTL2832U, R820T2, RTL-SDR Blog V3/V4):
+
+1. **Startup USB Enumeration:** Upon application launch, the engine probes USB buses using `rtl_test` to verify tuner accessibility and extract device serials.
+2. **Graceful Disconnect Handling:**
+   - If a dongle is unplugged during reception, the audio stream terminates cleanly without throwing unhandled exceptions.
+   - Any currently active audio recording is finalized and saved immediately to avoid corrupted or dangling files.
+   - Real-time telemetry notifies all connected WebSocket clients with `hardware_connected: false` and the top bar displays `● OFFLINE` (Red).
+3. **No-Device Modal & Reconnection:**
+   - The frontend automatically surfaces a **No Device Detected** warning modal with a "Retry Hardware Probe" button and a direct shortcut to Dongle Configuration.
+   - The backend receiver engine enters a non-blocking retry loop, automatically resuming reception and restoring status to `● RTL-SDR ONLINE` (Green) once the USB device is plugged back in.
+
+---
+
 ## 24-Hour Timeline Scrubber & Continuous Playback
 
 The timeline scrubber renders 24 hours of recorded activity onto an HTML5 Canvas:
@@ -241,23 +264,6 @@ The timeline scrubber renders 24 hours of recorded activity onto an HTML5 Canvas
 - **Continuous Auto-Play:** Pressing the bottom Play button initiates continuous playback through historical calls chronologically.
 - **Instant Call Stop:** History call cards feature an active Stop button (`■`) for immediate interruption.
 - **Audio Seeking with HTTP 206 Partial Content:** Native `Range: bytes=start-end` support enables instantaneous seeking without buffering entire files.
-
----
-
-## Mock SDR Simulator Mode
-
-No RTL-SDR hardware? No problem. SDR-Recorder includes an integrated **Mock SDR Simulator**:
-
-- Generates realistic Gaussian RF noise floor at `-65 dBFS`.
-- Synthesizes periodic airband/radio speech bursts at `-25 to -38 dBFS` with human voice formant harmonics (300 Hz – 2.5 kHz) and syllabic amplitude modulation.
-- To force simulator mode:
-  ```bash
-  python backend/run.py --simulator
-  # Or via environment variable:
-  export SDR_FORCE_SIMULATOR=1
-  ./scripts/start.sh
-  ```
-- If no RTL-SDR device is detected on USB upon launch, the system automatically falls back to Simulator Mode seamlessly without crashing.
 
 ---
 
