@@ -7,7 +7,7 @@ __pycache__
 *.pyo
 *.pyd
 .pytest_cache
-storage/
+/storage/
 frontend/node_modules/
 frontend/dist/
 .DS_Store
