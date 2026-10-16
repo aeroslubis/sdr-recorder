@@ -74,14 +74,12 @@ describe('Timeline Scrubber & Math Projection', () => {
 });
 
 describe('PlaybackControls Component', () => {
-  test('renders playback buttons, speed selector, DSP filter, volume slider and export', () => {
+  test('renders playback buttons, speed selector, and volume slider', () => {
     const handlePlayPause = jest.fn();
     const handlePrev = jest.fn();
     const handleNext = jest.fn();
     const handleSpeed = jest.fn();
-    const handleFilter = jest.fn();
     const handleVolume = jest.fn();
-    const handleExport = jest.fn();
 
     render(
       <PlaybackControls
@@ -91,12 +89,8 @@ describe('PlaybackControls Component', () => {
         onNextCall={handleNext}
         playbackRate={1.0}
         onPlaybackRateChange={handleSpeed}
-        dspFilterActive={false}
-        onToggleDspFilter={handleFilter}
         volume={0.8}
         onVolumeChange={handleVolume}
-        onExportClip={handleExport}
-        hasActiveCall={true}
       />
     );
 
@@ -115,25 +109,16 @@ describe('PlaybackControls Component', () => {
     fireEvent.click(nextBtn);
     expect(handleNext).toHaveBeenCalledTimes(1);
 
+    // Volume change (located right next to playback controls)
+    const volumeSlider = screen.getByLabelText(/Volume slider/i);
+    expect(volumeSlider).toBeInTheDocument();
+    fireEvent.change(volumeSlider, { target: { value: '0.4' } });
+    expect(handleVolume).toHaveBeenCalledWith(0.4);
+
     // Speed selector
     const speed2x = screen.getByRole('button', { name: /2\.0x/i });
     fireEvent.click(speed2x);
     expect(handleSpeed).toHaveBeenCalledWith(2.0);
-
-    // DSP Bandpass Filter toggle
-    const filterBtn = screen.getByRole('button', { name: /Voice Filter/i });
-    fireEvent.click(filterBtn);
-    expect(handleFilter).toHaveBeenCalledTimes(1);
-
-    // Volume change
-    const volumeSlider = screen.getByLabelText(/Volume slider/i);
-    fireEvent.change(volumeSlider, { target: { value: '0.4' } });
-    expect(handleVolume).toHaveBeenCalledWith(0.4);
-
-    // Export clip
-    const exportBtn = screen.getByRole('button', { name: /Export/i });
-    fireEvent.click(exportBtn);
-    expect(handleExport).toHaveBeenCalledTimes(1);
   });
 });
 

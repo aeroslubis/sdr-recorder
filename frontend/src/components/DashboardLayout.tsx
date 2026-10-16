@@ -51,9 +51,20 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
   const [squelchOpen, setSquelchOpen] = useState<boolean>(false);
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [liveUnsquelched, setLiveUnsquelched] = useState<boolean>(false);
-  const [volume, setVolume] = useState<number>(0.8);
-  const volumeRef = useRef<number>(0.8);
-  const savedVolumeRef = useRef<number>(0.8);
+  const [volume, setVolume] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('sdr_playback_volume');
+      if (saved !== null) {
+        const val = parseFloat(saved);
+        if (!isNaN(val) && val >= 0 && val <= 1) {
+          return val;
+        }
+      }
+    } catch {}
+    return 0.8;
+  });
+  const volumeRef = useRef<number>(volume);
+  const savedVolumeRef = useRef<number>(volume > 0 ? volume : 0.8);
   const savedAutoSquelchRef = useRef<number>(-42.0);
   const [isAutoSquelch, setIsAutoSquelch] = useState<boolean>(false);
 
@@ -127,6 +138,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
   }, []);
 
   useEffect(() => {
+    try {
+      localStorage.setItem('sdr_playback_volume', volume.toString());
+    } catch {}
     if (audioPlayerRef.current) {
       audioPlayerRef.current.setVolume(volume);
     }
@@ -568,23 +582,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
     }
   };
 
-  const handleToggleStar = async (id: number) => {
-    try {
-      const res = await authFetch(`/api/recordings/${id}/star`, {
-        method: 'POST',
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setCalls((prev) =>
-          prev.map((c) => (c.id === id ? { ...c, is_starred: data.is_starred } : c))
-        );
-        setTimelineTransmissions((prev) =>
-          prev.map((t) => (t.id === id ? { ...t, is_starred: data.is_starred } : t))
-        );
-      }
-    } catch {}
-  };
-
   const handleExportClip = async (id?: number) => {
     const targetId = id || selectedCallId;
     if (!targetId) return;
@@ -633,6 +630,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
     if (newVol > 0) {
       savedVolumeRef.current = newVol;
     }
+    try {
+      localStorage.setItem('sdr_playback_volume', newVol.toString());
+    } catch {}
     if (audioPlayerRef.current) {
       audioPlayerRef.current.setVolume(newVol);
       if (newVol > 0) {
@@ -902,7 +902,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
             activeDates={activeDates}
             onPlay={(call) => handlePlayCall(call.id)}
             onStop={handleStopPlayback}
-            onToggleStar={handleToggleStar}
             onSelectCall={handleSelectTransmission}
             onDownload={handleExportClip}
           />

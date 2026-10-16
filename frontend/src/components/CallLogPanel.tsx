@@ -1,7 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React from 'react';
 import {
-  Search,
-  Star,
   Play,
   Square,
   Download,
@@ -80,7 +78,6 @@ export const CallLogPanel: React.FC<CallLogPanelProps> = ({
   playingCallId = null,
   onPlay,
   onStop,
-  onToggleStar,
   onDownload,
   onSelectCall,
   currentDate = formatDate(new Date()),
@@ -89,34 +86,6 @@ export const CallLogPanel: React.FC<CallLogPanelProps> = ({
   isLoading = false,
   className = '',
 }) => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [starredOnly, setStarredOnly] = useState(false);
-
-  // Filtered calls
-  const filteredCalls = useMemo(() => {
-    return calls.filter((call) => {
-      const isStarred = Boolean(call.isStarred ?? call.is_starred);
-      if (starredOnly && !isStarred) return false;
-
-      if (!searchQuery.trim()) return true;
-
-      const q = searchQuery.toLowerCase().trim();
-      const timeStr = formatCallTime(call).toLowerCase();
-      const freqHz = (call.frequencyHz ?? call.frequency_hz ?? '').toString();
-      const freqMHz = formatFrequency(call.frequencyHz ?? call.frequency_hz).toLowerCase();
-      const notes = (call.notes ?? '').toLowerCase();
-      const modulation = (call.modulation ?? '').toLowerCase();
-
-      return (
-        timeStr.includes(q) ||
-        freqHz.includes(q) ||
-        freqMHz.includes(q) ||
-        notes.includes(q) ||
-        modulation.includes(q)
-      );
-    });
-  }, [calls, starredOnly, searchQuery]);
-
   const handleDownload = (id: number) => {
     if (onDownload) {
       onDownload(id);
@@ -148,7 +117,7 @@ export const CallLogPanel: React.FC<CallLogPanelProps> = ({
             </h2>
           </div>
           <span className="text-[11px] font-mono text-smoke">
-            {filteredCalls.length} / {calls.length} calls
+            {calls.length} calls
           </span>
         </div>
 
@@ -168,40 +137,6 @@ export const CallLogPanel: React.FC<CallLogPanelProps> = ({
             <span className="text-smoke text-[10px]">{calls.length} logs</span>
           </div>
         )}
-
-        {/* Search & Filter Bar */}
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <Search className="w-3.5 h-3.5 text-smoke absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search frequency, notes..."
-              className="w-full pl-8 pr-2.5 py-1.5 bg-ash border border-charcoal rounded-pill text-xs text-snow placeholder:text-smoke focus:outline-none focus:border-phosphor-green font-mono transition-colors"
-            />
-          </div>
-
-          {/* Starred Filter Button */}
-          <button
-            type="button"
-            onClick={() => setStarredOnly(!starredOnly)}
-            aria-label="Starred Only"
-            title="Filter Starred Only"
-            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-pill border text-xs font-mono transition-colors cursor-pointer ${
-              starredOnly
-                ? 'bg-amber-400/20 border-amber-400 text-amber-300 font-medium'
-                : 'bg-ash border-charcoal hover:border-slate text-silver-mist hover:text-snow'
-            }`}
-          >
-            <Star
-              className={`w-3.5 h-3.5 ${
-                starredOnly ? 'fill-amber-400 text-amber-400' : 'text-smoke'
-              }`}
-            />
-            <span className="hidden sm:inline">Starred</span>
-          </button>
-        </div>
       </div>
 
       {/* Call Cards List */}
@@ -211,19 +146,16 @@ export const CallLogPanel: React.FC<CallLogPanelProps> = ({
             <div className="w-4 h-4 border-2 border-phosphor-green border-t-transparent rounded-full animate-spin" />
             <span className="text-xs font-mono">Loading call history...</span>
           </div>
-        ) : filteredCalls.length === 0 ? (
+        ) : calls.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 text-smoke text-center px-4">
             <Radio className="w-8 h-8 text-charcoal mb-2" />
             <p className="text-xs font-medium text-silver-mist">No transmissions found</p>
             <p className="text-[11px] text-smoke mt-1">
-              {starredOnly
-                ? 'No starred transmissions match this filter.'
-                : 'No radio activity recorded for this period.'}
+              No radio activity recorded for this period.
             </p>
           </div>
         ) : (
-          filteredCalls.map((call) => {
-            const isStarred = Boolean(call.isStarred ?? call.is_starred);
+          calls.map((call) => {
             const isSelected = selectedCallId === call.id;
             const isPlaying = playingCallId === call.id;
             const duration = (call.durationSec ?? call.duration_sec ?? 0).toFixed(1);
@@ -254,24 +186,6 @@ export const CallLogPanel: React.FC<CallLogPanelProps> = ({
 
                   {/* Actions */}
                   <div className="flex items-center gap-1">
-                    {/* Star Toggle Button */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onToggleStar?.(call.id, !isStarred);
-                      }}
-                      aria-label="Star call"
-                      title={isStarred ? 'Unstar transmission' : 'Star to protect from retention purge'}
-                      className="p-1 rounded-pill hover:bg-obsidian transition-colors text-smoke hover:text-amber-400 cursor-pointer"
-                    >
-                      <Star
-                        className={`w-3.5 h-3.5 ${
-                          isStarred ? 'fill-amber-400 text-amber-400' : 'text-smoke hover:text-amber-400'
-                        }`}
-                      />
-                    </button>
-
                     {/* Quick Play/Stop Button */}
                     {isPlaying ? (
                       <button

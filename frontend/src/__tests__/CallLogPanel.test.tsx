@@ -32,15 +32,13 @@ const sampleCalls = [
 ];
 
 describe('CallLogPanel Component', () => {
-  test('renders call list and filters by starred', () => {
+  test('renders call list with frequency and time', () => {
     const handlePlay = jest.fn();
-    const handleToggleStar = jest.fn();
 
     render(
       <CallLogPanel
         calls={sampleCalls}
         onPlay={handlePlay}
-        onToggleStar={handleToggleStar}
       />
     );
 
@@ -48,37 +46,16 @@ describe('CallLogPanel Component', () => {
     expect(screen.getByText(/14:32:10/i)).toBeInTheDocument();
     expect(screen.getByText(/14:28:45/i)).toBeInTheDocument();
     expect(screen.getByText(/14:15:00/i)).toBeInTheDocument();
-
-    // Toggle starred filter
-    const starredFilterBtn = screen.getByRole('button', { name: /starred/i });
-    fireEvent.click(starredFilterBtn);
-
-    // Only starred call (id: 1) should remain
-    expect(screen.getByText(/14:32:10/i)).toBeInTheDocument();
-    expect(screen.queryByText(/14:28:45/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/14:15:00/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/3 calls/i)).toBeInTheDocument();
   });
 
-  test('filters calls by search input query', () => {
-    render(<CallLogPanel calls={sampleCalls} onPlay={jest.fn()} onToggleStar={jest.fn()} />);
-
-    const searchInput = screen.getByPlaceholderText(/search/i);
-    fireEvent.change(searchInput, { target: { value: 'Approach' } });
-
-    expect(screen.getByText(/14:28:45/i)).toBeInTheDocument();
-    expect(screen.queryByText(/14:32:10/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/14:15:00/i)).not.toBeInTheDocument();
-  });
-
-  test('triggers onPlay and onToggleStar callbacks', () => {
+  test('triggers onPlay callback when play button clicked', () => {
     const handlePlay = jest.fn();
-    const handleToggleStar = jest.fn();
 
     render(
       <CallLogPanel
         calls={sampleCalls}
         onPlay={handlePlay}
-        onToggleStar={handleToggleStar}
       />
     );
 
@@ -86,12 +63,6 @@ describe('CallLogPanel Component', () => {
     const playButtons = screen.getAllByRole('button', { name: /play call/i });
     fireEvent.click(playButtons[0]);
     expect(handlePlay).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
-
-    // Click star toggle on second item
-    const starButtons = screen.getAllByRole('button', { name: /star call/i });
-    // Star toggle for call 2
-    fireEvent.click(starButtons[1]);
-    expect(handleToggleStar).toHaveBeenCalledWith(2, true);
   });
 
   test('renders stop button for actively playing call and triggers onStop callback', () => {
