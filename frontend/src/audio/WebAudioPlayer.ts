@@ -23,7 +23,6 @@ export class WebAudioPlayer {
   constructor() {
     this.audio = typeof Audio !== 'undefined' ? new Audio() : ({} as HTMLAudioElement);
     if (this.audio.addEventListener) {
-      this.audio.crossOrigin = 'anonymous';
       this.audio.addEventListener('ended', this.handleEnded);
       this.audio.addEventListener('timeupdate', this.handleTimeUpdate);
       this.audio.addEventListener('play', this.handlePlay);
@@ -52,13 +51,9 @@ export class WebAudioPlayer {
 
       this.filterNode = this.audioContext.createBiquadFilter();
       this.filterNode.type = 'bandpass';
-      // Center frequency for speech (geometric mean of 300Hz and 3000Hz is ~948Hz, arithmetic ~1650Hz)
+      // Center frequency for speech
       this.filterNode.frequency.setValueAtTime(1650, this.audioContext.currentTime);
       this.filterNode.Q.setValueAtTime(0.7, this.audioContext.currentTime);
-
-      if (this.audio && this.audioContext.createMediaElementSource) {
-        this.sourceNode = this.audioContext.createMediaElementSource(this.audio);
-      }
 
       this.updateDspRouting();
     } catch (e) {
@@ -136,10 +131,12 @@ export class WebAudioPlayer {
       this.currentUrl = url;
       this.audio.src = url;
       this.audio.playbackRate = this.playbackRate;
+      this.audio.volume = this.volume;
       this.audio.currentTime = startTimeSec;
     } else if (startTimeSec > 0 && Math.abs(this.audio.currentTime - startTimeSec) > 0.5) {
       this.audio.currentTime = startTimeSec;
     }
+    this.audio.volume = this.volume;
 
     try {
       await this.audio.play();

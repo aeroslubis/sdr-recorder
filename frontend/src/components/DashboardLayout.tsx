@@ -722,7 +722,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
   };
 
   return (
-    <div className={`h-screen max-h-screen overflow-hidden bg-obsidian text-snow flex flex-col font-circular ${className}`}>
+    <div className={`h-screen h-[100dvh] max-h-[100dvh] min-h-[100dvh] overflow-hidden bg-obsidian text-snow flex flex-col font-circular ${className}`}>
       {/* 1. TopBar Header */}
       <TopBar
         frequencyHz={frequencyHz}
@@ -739,6 +739,48 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
         }}
         onLogout={logout}
       />
+
+      {/* 1b. Mobile Top Navigation Tab Bar (< lg only) */}
+      <div className="lg:hidden flex items-center bg-ash border-b border-charcoal px-2.5 py-1.5 gap-1.5 shrink-0 select-none z-20">
+        <button
+          type="button"
+          onClick={() => setMobileTab('timeline')}
+          className={`flex-1 py-1.5 px-3 rounded text-xs font-mono font-medium flex items-center justify-center gap-1.5 transition-colors ${
+            mobileTab === 'timeline'
+              ? 'bg-phosphor-green/20 text-phosphor-green border border-phosphor-green/40 shadow-sm'
+              : 'text-silver-mist hover:text-snow bg-charcoal/40 border border-transparent'
+          }`}
+        >
+          <PlayCircle className="w-3.5 h-3.5" />
+          <span>Timeline</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setMobileTab('history')}
+          className={`flex-1 py-1.5 px-3 rounded text-xs font-mono font-medium flex items-center justify-center gap-1.5 transition-colors ${
+            mobileTab === 'history'
+              ? 'bg-phosphor-green/20 text-phosphor-green border border-phosphor-green/40 shadow-sm'
+              : 'text-silver-mist hover:text-snow bg-charcoal/40 border border-transparent'
+          }`}
+        >
+          <Clock className="w-3.5 h-3.5" />
+          <span>History</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setMobileTab('radio')}
+          className={`flex-1 py-1.5 px-3 rounded text-xs font-mono font-medium flex items-center justify-center gap-1.5 transition-colors ${
+            mobileTab === 'radio'
+              ? 'bg-phosphor-green/20 text-phosphor-green border border-phosphor-green/40 shadow-sm'
+              : 'text-silver-mist hover:text-snow bg-charcoal/40 border border-transparent'
+          }`}
+        >
+          <Radio className="w-3.5 h-3.5" />
+          <span>Radio</span>
+        </button>
+      </div>
 
       {/* 2. Responsive 3-Column Dashboard Body */}
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden">
@@ -870,7 +912,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
       {/* 3. Mobile Bottom Navigation Bar (< lg only) */}
       <nav
         aria-label="Mobile Navigation"
-        className="lg:hidden h-14 bg-ash border-t border-charcoal flex items-center justify-around shrink-0 px-2 select-none z-30"
+        className="lg:hidden h-14 bg-ash border-t border-charcoal flex items-center justify-around shrink-0 px-2 select-none z-30 pb-[env(safe-area-inset-bottom)]"
       >
         <button
           type="button"

@@ -201,7 +201,7 @@ def get_recording_audio(
     if suffix == ".wav":
         content_type = "audio/wav"
     elif suffix in [".opus", ".ogg"]:
-        content_type = "audio/ogg; codecs=opus"
+        content_type = "audio/ogg"
     elif suffix == ".mp3":
         content_type = "audio/mpeg"
     else:
@@ -213,6 +213,8 @@ def get_recording_audio(
             "Accept-Ranges": "bytes",
             "Content-Length": str(file_size),
             "Content-Type": content_type,
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Expose-Headers": "Content-Range, Accept-Ranges, Content-Length",
         }
         if download:
             headers["Content-Disposition"] = f'attachment; filename="{file_path.name}"'
@@ -257,7 +259,11 @@ def get_recording_audio(
     if start > end or start >= file_size:
         return Response(
             status_code=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE,
-            headers={"Content-Range": f"bytes */{file_size}"},
+            headers={
+                "Content-Range": f"bytes */{file_size}",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Expose-Headers": "Content-Range, Accept-Ranges, Content-Length",
+            },
         )
 
     end = min(end, file_size - 1)
@@ -272,6 +278,8 @@ def get_recording_audio(
         "Accept-Ranges": "bytes",
         "Content-Length": str(chunk_length),
         "Content-Type": content_type,
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Expose-Headers": "Content-Range, Accept-Ranges, Content-Length",
     }
     return Response(
         content=data,

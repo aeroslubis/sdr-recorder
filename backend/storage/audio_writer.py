@@ -70,12 +70,30 @@ def save_transmission(
         wav_file = target_dir / f"{base_name}_{counter}.wav"
         counter += 1
 
+    import numpy as np
+
+    raw_audio = event.audio_data
+    if len(raw_audio) >= 2:
+        try:
+            samples = np.frombuffer(raw_audio, dtype=np.int16)
+            if len(samples) > 0:
+                max_abs = int(np.max(np.abs(samples)))
+                # If transmission contains audible voice signal above quiet background noise
+                if max_abs >= 500:
+                    target_peak = 28000.0
+                    gain = min(6.0, target_peak / float(max_abs))
+                    if gain > 1.05:
+                        normalized = np.clip(samples.astype(np.float32) * gain, -32767, 32767).astype(np.int16)
+                        raw_audio = normalized.tobytes()
+        except Exception as e:
+            logger.debug(f"Audio normalization skipped: {e}")
+
     # Write uncompressed 16-bit mono PCM WAV
     with wave.open(str(wav_file), "wb") as wf:
         wf.setnchannels(1)
         wf.setsampwidth(2)
         wf.setframerate(sample_rate)
-        wf.writeframes(event.audio_data)
+        wf.writeframes(raw_audio)
 
     final_file = wav_file
 
@@ -86,9 +104,9 @@ def save_transmission(
             "ffmpeg",
             "-y",
             "-i", str(wav_file),
-            "-af", "highpass=f=250,lowpass=f=3500",
             "-c:a", "libopus" if ext in ["opus", "ogg"] else "libmp3lame",
-            "-b:a", "24k",
+            "-b:a", "32k" if ext in ["opus", "ogg"] else "64k",
+            "-vbr", "on",
             str(converted_file),
         ]
         try:
