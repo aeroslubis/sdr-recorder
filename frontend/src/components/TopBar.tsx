@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   Radio,
   HardDrive,
-  ChevronDown,
   LogOut,
   Sliders,
   Clock,
