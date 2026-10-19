@@ -44,6 +44,7 @@ describe('TopBar', () => {
     );
 
     const adminButton = screen.getByRole('button', { name: /admin/i });
+    expect(adminButton.textContent).toBe('');
     fireEvent.click(adminButton);
 
     // Verify only Settings and Sign Out appear in menu

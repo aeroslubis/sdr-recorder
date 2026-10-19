@@ -6,6 +6,7 @@ import {
   LogOut,
   Sliders,
   Clock,
+  User,
 } from 'lucide-react';
 import { SettingsTab } from './SettingsModal';
 
@@ -140,16 +141,13 @@ export const TopBar: React.FC<TopBarProps> = ({
           <button
             type="button"
             onClick={() => setMenuOpen(!menuOpen)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-pill bg-ash border border-charcoal hover:border-slate text-silver-mist hover:text-snow text-xs font-mono transition-colors cursor-pointer"
+            className="flex items-center justify-center p-1.5 rounded-full bg-ash border border-charcoal hover:border-slate text-silver-mist hover:text-snow transition-colors cursor-pointer group"
+            aria-label="Admin Menu"
+            title={username}
             aria-haspopup="true"
             aria-expanded={menuOpen}
           >
-            <span>{username}</span>
-            <ChevronDown
-              className={`w-3.5 h-3.5 text-smoke transition-transform ${
-                menuOpen ? 'rotate-180' : ''
-              }`}
-            />
+            <User className="w-4 h-4 text-silver-mist group-hover:text-snow" />
           </button>
 
           {menuOpen && (
