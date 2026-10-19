@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Radio, ArrowRight, AlertCircle, Lock, User as UserIcon } from 'lucide-react';
+import { Radio, LogIn, AlertCircle, Lock, User as UserIcon } from 'lucide-react';
 
 export interface LoginViewProps {
   onLogin?: (username: string, password: string) => void | Promise<void | boolean>;
@@ -12,8 +12,8 @@ export const LoginView: React.FC<LoginViewProps> = ({
   error: externalError,
   isLoading = false,
 }) => {
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('12345');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [internalError, setInternalError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -38,12 +38,6 @@ export const LoginView: React.FC<LoginViewProps> = ({
         setSubmitting(false);
       }
     }
-  };
-
-  const handleFillDefaults = () => {
-    setUsername('admin');
-    setPassword('12345');
-    setInternalError(null);
   };
 
   return (
@@ -135,21 +129,10 @@ export const LoginView: React.FC<LoginViewProps> = ({
             disabled={isLoading || submitting}
             className="w-full mt-2 py-2.5 px-4 bg-phosphor-green text-[#121212] font-medium text-sm rounded-buttons hover:bg-mint-pulse active:scale-[0.99] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
-            <span>{isLoading || submitting ? 'Signing In...' : 'Sign In ->'}</span>
-            {!isLoading && !submitting && <ArrowRight className="w-4 h-4" />}
+            <span>{isLoading || submitting ? 'Signing In...' : 'Sign In'}</span>
+            {!isLoading && !submitting && <LogIn className="w-4 h-4" />}
           </button>
         </form>
-
-        {/* Credentials Hint */}
-        <div className="mt-6 pt-5 border-t border-charcoal/80 text-center">
-          <p
-            onClick={handleFillDefaults}
-            className="text-xs text-smoke cursor-pointer hover:text-silver-mist transition-colors"
-            title="Click to fill default credentials"
-          >
-            Default credentials: admin / 12345
-          </p>
-        </div>
       </div>
 
       <div className="mt-8 text-xs text-smoke font-mono">

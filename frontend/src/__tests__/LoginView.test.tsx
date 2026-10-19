@@ -2,14 +2,21 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import { LoginView } from '../components/LoginView';
 
 describe('LoginView Component', () => {
-  test('renders login view with default credentials hint in english', () => {
+  test('renders login view with empty credentials and clean sign in button without arrow', () => {
     render(<LoginView onLogin={jest.fn()} />);
-    expect(screen.getByText(/Default credentials: admin \/ 12345/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Default credentials/i)).not.toBeInTheDocument();
     expect(screen.getByText(/RECORDER/i)).toBeInTheDocument();
     expect(screen.getByText(/Continuous Radio Monitoring & Archiving System/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
-    expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
+    
+    const submitButton = screen.getByRole('button', { name: /sign in/i });
+    expect(submitButton).toBeInTheDocument();
+    expect(submitButton.textContent).toBe('Sign In');
+    expect(submitButton.textContent).not.toContain('->');
+
+    const usernameInput = screen.getByLabelText(/username/i) as HTMLInputElement;
+    const passwordInput = screen.getByLabelText(/password/i) as HTMLInputElement;
+    expect(usernameInput.value).toBe('');
+    expect(passwordInput.value).toBe('');
   });
 
   test('submits form with entered username and password', async () => {
