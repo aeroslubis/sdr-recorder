@@ -7,13 +7,10 @@ import { PlaybackControls } from './PlaybackControls';
 import { CallLogPanel, CallLogItem } from './CallLogPanel';
 import { SettingsModal, SettingsTab, StorageSettings } from './SettingsModal';
 import { LiveSpectrumVisualizer } from './LiveSpectrumVisualizer';
-import { PlayCircle, Clock, Radio } from 'lucide-react';
 import { DongleHardwareConfig } from './DongleConfigModal';
 import { WebAudioPlayer } from '../audio/WebAudioPlayer';
 import { formatDate } from './HistoryDatePicker';
 import { NoDeviceModal } from './NoDeviceModal';
-
-export type MobileTab = 'timeline' | 'history' | 'radio';
 
 export interface DashboardLayoutProps {
   className?: string;
@@ -27,7 +24,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
   const [activeDates, setActiveDates] = useState<string[]>([]);
   const [serverTimeStr, setServerTimeStr] = useState<string>('');
   const [serverTzStr, setServerTzStr] = useState<string>('');
-  const [mobileTab, setMobileTab] = useState<MobileTab>('timeline');
 
   // Hardware and Radio state
   const [frequencyHz, setFrequencyHz] = useState<number>(118200000);
@@ -722,7 +718,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
   };
 
   return (
-    <div className={`h-screen h-[100dvh] max-h-[100dvh] min-h-[100dvh] overflow-hidden bg-obsidian text-snow flex flex-col font-circular ${className}`}>
+    <div className={`h-screen max-h-screen overflow-hidden bg-obsidian text-snow flex flex-col font-circular ${className}`}>
       {/* 1. TopBar Header */}
       <TopBar
         frequencyHz={frequencyHz}
@@ -740,56 +736,10 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
         onLogout={logout}
       />
 
-      {/* 1b. Mobile Top Navigation Tab Bar (< lg only) */}
-      <div className="lg:hidden flex items-center bg-ash border-b border-charcoal px-2.5 py-1.5 gap-1.5 shrink-0 select-none z-20">
-        <button
-          type="button"
-          onClick={() => setMobileTab('timeline')}
-          className={`flex-1 py-1.5 px-3 rounded text-xs font-mono font-medium flex items-center justify-center gap-1.5 transition-colors ${
-            mobileTab === 'timeline'
-              ? 'bg-phosphor-green/20 text-phosphor-green border border-phosphor-green/40 shadow-sm'
-              : 'text-silver-mist hover:text-snow bg-charcoal/40 border border-transparent'
-          }`}
-        >
-          <PlayCircle className="w-3.5 h-3.5" />
-          <span>Timeline</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setMobileTab('history')}
-          className={`flex-1 py-1.5 px-3 rounded text-xs font-mono font-medium flex items-center justify-center gap-1.5 transition-colors ${
-            mobileTab === 'history'
-              ? 'bg-phosphor-green/20 text-phosphor-green border border-phosphor-green/40 shadow-sm'
-              : 'text-silver-mist hover:text-snow bg-charcoal/40 border border-transparent'
-          }`}
-        >
-          <Clock className="w-3.5 h-3.5" />
-          <span>History</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setMobileTab('radio')}
-          className={`flex-1 py-1.5 px-3 rounded text-xs font-mono font-medium flex items-center justify-center gap-1.5 transition-colors ${
-            mobileTab === 'radio'
-              ? 'bg-phosphor-green/20 text-phosphor-green border border-phosphor-green/40 shadow-sm'
-              : 'text-silver-mist hover:text-snow bg-charcoal/40 border border-transparent'
-          }`}
-        >
-          <Radio className="w-3.5 h-3.5" />
-          <span>Radio</span>
-        </button>
-      </div>
-
-      {/* 2. Responsive 3-Column Dashboard Body */}
-      <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden">
-        {/* Left Column: Radio Tuning Panel (300px on desktop, visible on mobile when mobileTab === 'radio') */}
-        <div
-          className={`w-full lg:w-72 xl:w-80 shrink-0 border-r border-charcoal bg-obsidian/40 overflow-y-auto h-full min-h-0 ${
-            mobileTab === 'radio' ? 'block' : 'hidden lg:block'
-          }`}
-        >
+      {/* 2. Standard 3-Column Dashboard Body */}
+      <div className="flex-1 min-h-0 flex overflow-hidden">
+        {/* Left Column: Radio Tuning Panel */}
+        <div className="w-72 xl:w-80 shrink-0 border-r border-charcoal bg-obsidian/40 overflow-y-auto h-full min-h-0">
           <RadioTuningPanel
             frequencyHz={frequencyHz}
             modulation={modulation}
@@ -812,12 +762,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
           />
         </div>
 
-        {/* Center Column: Live Monitor, Spectrum (Desktop only), Timeline Scrubber & Playback Controls */}
-        <main
-          className={`flex-1 min-w-0 min-h-0 flex-col overflow-hidden p-2.5 sm:p-3 md:p-4 gap-2.5 sm:gap-3 bg-obsidian h-full ${
-            mobileTab === 'timeline' ? 'flex' : 'hidden lg:flex'
-          }`}
-        >
+        {/* Center Column: Live Monitor, Live Spectrum Visualizer, Timeline Scrubber & Playback Controls */}
+        <main className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden p-3 md:p-4 gap-3 bg-obsidian h-full">
           {/* Live Audio Monitor & Telemetry Bar */}
           <div className="bg-ash/80 backdrop-blur border border-charcoal rounded-cards px-3.5 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between gap-3 select-none shrink-0">
             {/* Live Reception Status */}
@@ -843,8 +789,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
             </div>
           </div>
 
-          {/* Live SDR Spectrum Visualizer (Spectrum only on Desktop, HIDDEN on mobile) */}
-          <div className="hidden lg:block shrink-0">
+          {/* Live SDR Spectrum Visualizer */}
+          <div className="shrink-0">
             <LiveSpectrumVisualizer
               frequencyHz={frequencyHz}
               modulation={modulation}
@@ -888,11 +834,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
         </main>
 
         {/* Right Column: Call Log History Panel with HistoryDatePicker */}
-        <div
-          className={`w-full lg:w-80 xl:w-[340px] h-full max-h-full min-h-0 flex-shrink-0 flex-col overflow-hidden ${
-            mobileTab === 'history' ? 'flex' : 'hidden lg:flex'
-          }`}
-        >
+        <div className="w-80 xl:w-[340px] h-full max-h-full min-h-0 flex-shrink-0 flex flex-col overflow-hidden">
           <CallLogPanel
             calls={calls}
             selectedCallId={selectedCallId}
@@ -907,54 +849,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
           />
         </div>
       </div>
-
-      {/* 3. Mobile Bottom Navigation Bar (< lg only) */}
-      <nav
-        aria-label="Mobile Navigation"
-        className="lg:hidden h-14 bg-ash border-t border-charcoal flex items-center justify-around shrink-0 px-2 select-none z-30 pb-[env(safe-area-inset-bottom)]"
-      >
-        <button
-          type="button"
-          onClick={() => setMobileTab('timeline')}
-          aria-label="Timeline Tab"
-          className={`flex flex-col items-center justify-center flex-1 py-1 gap-1 cursor-pointer transition-colors ${
-            mobileTab === 'timeline'
-              ? 'text-phosphor-green font-semibold'
-              : 'text-smoke hover:text-snow'
-          }`}
-        >
-          <PlayCircle className="w-5 h-5" />
-          <span className="text-[11px] font-mono tracking-tight">Timeline</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setMobileTab('history')}
-          aria-label="History Tab"
-          className={`flex flex-col items-center justify-center flex-1 py-1 gap-1 cursor-pointer transition-colors ${
-            mobileTab === 'history'
-              ? 'text-phosphor-green font-semibold'
-              : 'text-smoke hover:text-snow'
-          }`}
-        >
-          <Clock className="w-5 h-5" />
-          <span className="text-[11px] font-mono tracking-tight">History</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setMobileTab('radio')}
-          aria-label="Radio Tab"
-          className={`flex flex-col items-center justify-center flex-1 py-1 gap-1 cursor-pointer transition-colors ${
-            mobileTab === 'radio'
-              ? 'text-phosphor-green font-semibold'
-              : 'text-smoke hover:text-snow'
-          }`}
-        >
-          <Radio className="w-5 h-5" />
-          <span className="text-[11px] font-mono tracking-tight">Radio</span>
-        </button>
-      </nav>
 
       {/* Unified Multi-Tab Settings Modal */}
       <SettingsModal

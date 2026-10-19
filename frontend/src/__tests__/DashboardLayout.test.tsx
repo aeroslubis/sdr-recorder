@@ -35,7 +35,7 @@ vi.mock('../audio/WebAudioPlayer', () => {
 
 // DashboardLayout test suite
 
-describe('DashboardLayout Mobile View & Navigation', () => {
+describe('DashboardLayout Unified Standard Layout', () => {
   beforeEach(() => {
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url.includes('/api/radio/status')) {
@@ -111,31 +111,20 @@ describe('DashboardLayout Mobile View & Navigation', () => {
     vi.clearAllMocks();
   });
 
-  test('renders mobile navigation bar and toggles tabs correctly', async () => {
+  test('renders unified 3-column layout with spectrum visualizer and no mobile navigation tabs', async () => {
     render(<DashboardLayout />);
 
-    // Verify Mobile Navigation Bar is present
-    const mobileNav = screen.getByRole('navigation', { name: /mobile navigation/i });
-    expect(mobileNav).toBeInTheDocument();
+    // Mobile Navigation Bar must NOT be present
+    expect(screen.queryByRole('navigation', { name: /mobile navigation/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /timeline tab/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /history tab/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /radio tab/i })).not.toBeInTheDocument();
 
-    const timelineTab = screen.getByRole('button', { name: /timeline tab/i });
-    const historyTab = screen.getByRole('button', { name: /history tab/i });
-    const radioTab = screen.getByRole('button', { name: /radio tab/i });
-
-    expect(timelineTab).toBeInTheDocument();
-    expect(historyTab).toBeInTheDocument();
-    expect(radioTab).toBeInTheDocument();
-
-    // Default tab is Timeline: Timeline canvas is rendered
-    expect(screen.getByTestId('timeline-canvas')).toBeInTheDocument();
-
-    // Switch to History Tab
-    fireEvent.click(historyTab);
-    expect(historyTab.className).toContain('text-phosphor-green');
-
-    // Switch to Radio Tab
-    fireEvent.click(radioTab);
-    expect(radioTab.className).toContain('text-phosphor-green');
+    // All 3 main sections + Live Spectrum must be simultaneously rendered
     expect(screen.getByText(/tuned frequency/i)).toBeInTheDocument();
+    expect(screen.getByText(/LIVE SDR SPECTRUM/i)).toBeInTheDocument();
+    expect(screen.getByTestId('sdr-spectrum-canvas')).toBeInTheDocument();
+    expect(screen.getByTestId('timeline-canvas')).toBeInTheDocument();
+    expect(screen.getByText(/call log history/i)).toBeInTheDocument();
   });
 });
