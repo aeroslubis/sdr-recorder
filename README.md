@@ -44,49 +44,7 @@
 
 ## Overview & Architecture
 
-Traditional SDR tools either record continuous raw baseband IQ data (wasting gigabytes per minute of static noise) or stream unbuffered audio directly to speakers. **SDR-Recorder** treats radio monitoring like modern surveillance CCTV / NVR systems:
-
-```
-+-----------------------------------------------------------------------------------+
-| RTL-SDR Dongle (USB Hardware: RTL2832U / R820T2 / RTL-SDR Blog V3/V4)             |
-| [Continuous USB Health Monitoring & Automatic Disconnect Safeguard]                |
-+-----------------------------------------------------------------------------------+
-                                         │
-                                         ▼ Subprocess Pipe
-                         `rtl_fm -d <idx> -f <freq> -M <am|fm> -s 24k`
-                                         │ Raw PCM 16-bit 24kHz Mono (50ms chunks)
-                                         ▼
-+-----------------------------------------------------------------------------------+
-| AUDIO & SQUELCH PROCESSING PIPELINE (Python Async Engine)                         |
-|                                                                                   |
-| 1. Compute RMS Power: RSSI_dBFS = 20 * log10(RMS / 32768.0)                      |
-| 2. Broadcast RSSI & Squelch state to WebSocket (/ws/live) at 10 Hz                |
-| 3. Compare RSSI against Squelch Threshold (Manual or Auto-Squelch Calibrated):    |
-|                                                                                   |
-|    [ Squelch CLOSED: RSSI < Threshold ]                                           |
-|    - Append audio chunk to In-Memory Circular Pre-Roll Buffer (Capacity: 500ms)  |
-|    - If active recording was in progress:                                        |
-|      - Decrement Hang Time Counter (800ms)                                        |
-|      - When Hang Time expires -> Finalize file write & register to SQLite         |
-|                                                                                   |
-|    [ Squelch OPEN: RSSI >= Threshold ]                                            |
-|    - If new transmission:                                                         |
-|      - Flush 500ms Pre-Roll Buffer into new Audio File stream                     |
-|      - Reset Hang Time Counter to 800ms                                           |
-|      - Record transmission start_time & peak RSSI                                 |
-|    - Write current audio chunk to active file stream                              |
-|    - If Live Audio Monitor is active -> push audio chunk to WebSocket client      |
-|                                                                                   |
-|    [ Hardware Disconnect Event: USB Unplugged / Hardware Fault ]                  |
-|    - Immediately finalize & flush active transmission (prevents file corruption)   |
-|    - Broadcast hardware_connected = False & OFFLINE state to WebSocket clients   |
-|    - Client displays NoDeviceModal warning; background engine probes for reconnect|
-+-----------------------------------------------------------------------------------+
-                                         │
-                                         ▼ Finalized Transmission
-                  Audio File: `storage/recordings/YYYY-MM-DD/ch_<id>_<ts>.opus`
-                  Metadata: Insert into SQLite `transmissions` table (WAL Mode)
-```
+Traditional SDR tools either record continuous raw baseband IQ data (wasting gigabytes per minute of static noise) or stream unbuffered audio directly to speakers. **SDR-Recorder** treats radio monitoring like modern surveillance CCTV / NVR systems.
 
 ### Core Architecture Components
 
