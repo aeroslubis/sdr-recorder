@@ -2,6 +2,7 @@
 import asyncio
 import inspect
 import logging
+import os
 import re
 import select
 import shutil
@@ -45,6 +46,54 @@ def is_hardware_available(device_index: int = 0) -> bool:
             return False
 
     return False
+
+
+USBDEVFS_RESET = 0x5514
+
+
+def reset_rtl_sdr_usb_dongle(device_index: int = 0) -> bool:
+    """
+    Finds Realtek RTL2832U USB device in /sys/bus/usb/devices/ and resets it via ioctl.
+    Returns True if reset succeeded, False otherwise.
+    """
+    import glob
+    found_devices: List[Tuple[int, int]] = []
+    for dev_dir in glob.glob("/sys/bus/usb/devices/*"):
+        v_file = os.path.join(dev_dir, "idVendor")
+        p_file = os.path.join(dev_dir, "idProduct")
+        if os.path.exists(v_file) and os.path.exists(p_file):
+            try:
+                with open(v_file, "r") as f:
+                    vendor = f.read().strip().lower()
+                with open(p_file, "r") as f:
+                    product = f.read().strip().lower()
+
+                if vendor == "0bda" and product in ("2838", "2832"):
+                    with open(os.path.join(dev_dir, "busnum"), "r") as f:
+                        bus = int(f.read().strip())
+                    with open(os.path.join(dev_dir, "devnum"), "r") as f:
+                        dev = int(f.read().strip())
+                    found_devices.append((bus, dev))
+            except Exception:
+                continue
+
+    if not found_devices or device_index >= len(found_devices):
+        return False
+
+    bus, dev = found_devices[device_index]
+    dev_path = f"/dev/bus/usb/{bus:03d}/{dev:03d}"
+    if not os.path.exists(dev_path):
+        return False
+
+    try:
+        import fcntl
+        with open(dev_path, "wb") as f:
+            fcntl.ioctl(f, USBDEVFS_RESET, 0)
+        logger.info(f"Successfully sent USBDEVFS_RESET to {dev_path}")
+        return True
+    except Exception as e:
+        logger.warning(f"USB reset ioctl failed on {dev_path}: {e}")
+        return False
 
 
 def get_available_devices() -> List[Dict[str, Any]]:
@@ -592,11 +641,23 @@ class SDRReceiver:
         self._current_transmission_chunks = []
         self._current_transmission_start = None
 
-    async def restart(self) -> None:
-        """Restarts the receiver engine."""
-        await self.stop()
-        await asyncio.sleep(0.15)
-        await self.start()
+    async def restart(self, reset_usb: bool = False) -> bool:
+        """Restarts the receiver engine, optionally issuing a USB port hardware reset."""
+        try:
+            await self.stop()
+            if reset_usb:
+                try:
+                    await asyncio.to_thread(reset_rtl_sdr_usb_dongle, self.config.device_index)
+                    await asyncio.sleep(1.0)
+                except Exception as e:
+                    logger.debug(f"USB reset during restart skipped or failed: {e}")
+            else:
+                await asyncio.sleep(0.15)
+            await self.start()
+            return bool(self._running and self._is_hardware_connected)
+        except Exception as e:
+            logger.error(f"Error restarting receiver: {e}", exc_info=True)
+            return False
 
     async def update_config(self, new_config: DongleConfig) -> None:
         """

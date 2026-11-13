@@ -1,4 +1,5 @@
 import asyncio
+from unittest.mock import patch, AsyncMock
 import numpy as np
 import pytest
 
@@ -233,5 +234,18 @@ async def test_squelch_tail_suppression():
     # Sustained speech -> MUST BE RECORDED
     assert len(transmissions_recorded) == 1
     assert transmissions_recorded[0].duration_sec >= 0.30
+
+
+@pytest.mark.asyncio
+async def test_receiver_restart_with_usb_reset():
+    from backend.sdr.receiver import reset_rtl_sdr_usb_dongle
+    receiver = SDRReceiver()
+    with patch("backend.sdr.receiver.is_hardware_available", return_value=True), \
+         patch("backend.sdr.receiver.reset_rtl_sdr_usb_dongle", return_value=True) as mock_reset, \
+         patch("asyncio.sleep", new_callable=AsyncMock):
+        success = await receiver.restart(reset_usb=True)
+        assert success is True
+        mock_reset.assert_called_once_with(receiver.config.device_index)
+
 
 

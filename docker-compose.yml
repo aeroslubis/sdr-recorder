@@ -1,9 +1,6 @@
 services:
   sdr-recorder:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: sdr-recorder:latest
+    image: putrasukarno/sdr-recorder:latest
     container_name: sdr-recorder
     restart: unless-stopped
     ports:

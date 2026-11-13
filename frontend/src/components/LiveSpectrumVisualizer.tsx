@@ -266,13 +266,22 @@ export const LiveSpectrumVisualizer: React.FC<LiveSpectrumVisualizerProps> = ({
       animFrameRef.current = requestAnimationFrame(render);
     };
 
-    renderRef.current = render;
-    render();
+    const requestRender = () => {
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = null;
+      }
+      render();
+    };
+
+    renderRef.current = requestRender;
+    requestRender();
 
     return () => {
       renderRef.current = undefined;
       if (animFrameRef.current) {
         cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = null;
       }
     };
   }, []);

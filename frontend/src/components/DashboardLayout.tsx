@@ -671,6 +671,25 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
     } catch {}
   };
 
+  // Dongle Restart Device Handler
+  const handleRestartDongle = async () => {
+    try {
+      const res = await authFetch('/api/radio/restart', {
+        method: 'POST',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (typeof data?.hardware_connected === 'boolean') {
+          setHardwareConnected(data.hardware_connected);
+        }
+        return { success: Boolean(data?.success) };
+      }
+      return { success: false, error: 'Failed to restart device' };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Error restarting device' };
+    }
+  };
+
   // Storage Save Config Handler
   const handleSaveStorageConfig = async (newSettings: StorageSettings) => {
     try {
@@ -856,6 +875,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
         initialTab={settingsTab}
         onClose={() => setIsSettingsOpen(false)}
         onSaveDongle={handleSaveDongleConfig}
+        onRestartDongle={handleRestartDongle}
         onSaveStorage={handleSaveStorageConfig}
         onChangePassword={handleChangePassword}
         presets={presets}

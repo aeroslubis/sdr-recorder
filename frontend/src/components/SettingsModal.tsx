@@ -11,6 +11,7 @@ import {
   Trash2,
   Edit2,
   Save,
+  RotateCw,
   Mic,
   Clock,
 } from 'lucide-react';
@@ -66,6 +67,7 @@ export interface SettingsModalProps {
   initialTab?: SettingsTab;
   onClose: () => void;
   onSaveDongle: (config: DongleHardwareConfig) => Promise<void> | void;
+  onRestartDongle?: () => Promise<{ success: boolean; error?: string } | void> | void;
   onSaveStorage: (settings: StorageSettings) => Promise<void> | void;
   onSaveRecording?: (settings: RecordingSettings) => Promise<void> | void;
   onChangePassword: (passwords: {
@@ -88,6 +90,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   initialTab = 'dongle',
   onClose,
   onSaveDongle,
+  onRestartDongle,
   onSaveStorage,
   onSaveRecording,
   onChangePassword,
@@ -161,6 +164,29 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const [dongleSaving, setDongleSaving] = useState(false);
   const [dongleSaved, setDongleSaved] = useState(false);
+  const [dongleRestarting, setDongleRestarting] = useState(false);
+  const [dongleRestartFeedback, setDongleRestartFeedback] = useState<string | null>(null);
+
+  const handleRestartDongleClick = async () => {
+    if (!onRestartDongle || dongleRestarting) return;
+    setDongleRestarting(true);
+    setDongleRestartFeedback(null);
+    try {
+      const res = await onRestartDongle();
+      if (res && res.success === false) {
+        setDongleRestartFeedback(res.error || 'Failed to restart device');
+      } else {
+        setDongleRestartFeedback('Device restarted successfully');
+      }
+    } catch (err: any) {
+      setDongleRestartFeedback(err?.message || 'Error restarting device');
+    } finally {
+      setDongleRestarting(false);
+      setTimeout(() => {
+        setDongleRestartFeedback(null);
+      }, 4000);
+    }
+  };
 
   // Tab 2: Channel Presets Manager State
   const [showAddPreset, setShowAddPreset] = useState(false);
@@ -772,22 +798,42 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
               {/* Actions */}
               <div className="flex items-center justify-between pt-3 border-t border-charcoal">
-                {dongleSaved && (
-                  <span className="text-xs text-phosphor-green flex items-center gap-1.5 font-mono">
-                    <Check className="w-3.5 h-3.5" />
-                    <span>Configuration saved and applied.</span>
-                  </span>
-                )}
-                {!dongleSaved && <span />}
+                <div className="flex items-center gap-2">
+                  {onRestartDongle && (
+                    <button
+                      type="button"
+                      disabled={dongleRestarting || dongleSaving}
+                      onClick={handleRestartDongleClick}
+                      className="flex items-center gap-1.5 px-3 py-2 bg-ash hover:bg-slate-700 text-silver-mist hover:text-snow border border-charcoal rounded-pill transition-colors text-xs cursor-pointer disabled:opacity-50"
+                    >
+                      <RotateCw className={`w-3.5 h-3.5 ${dongleRestarting ? 'animate-spin text-phosphor-green' : ''}`} />
+                      <span>{dongleRestarting ? 'Restarting Device...' : 'Restart Device'}</span>
+                    </button>
+                  )}
+                  {dongleRestartFeedback && (
+                    <span className="text-xs text-smoke font-mono">
+                      {dongleRestartFeedback}
+                    </span>
+                  )}
+                </div>
 
-                <button
-                  type="submit"
-                  disabled={dongleSaving}
-                  className="flex items-center gap-2 px-4 py-2 bg-phosphor-green text-obsidian font-medium rounded-pill hover:bg-mint-pulse transition-colors text-xs cursor-pointer ml-auto"
-                >
-                  <Save className="w-4 h-4" />
-                  <span>{dongleSaving ? 'Applying...' : 'Apply & Reconfigure Dongle'}</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  {dongleSaved && (
+                    <span className="text-xs text-phosphor-green flex items-center gap-1.5 font-mono">
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Configuration saved and applied.</span>
+                    </span>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={dongleSaving || dongleRestarting}
+                    className="flex items-center gap-2 px-4 py-2 bg-phosphor-green text-obsidian font-medium rounded-pill hover:bg-mint-pulse transition-colors text-xs cursor-pointer ml-auto"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>{dongleSaving ? 'Applying...' : 'Apply & Reconfigure Dongle'}</span>
+                  </button>
+                </div>
               </div>
             </form>
           )}

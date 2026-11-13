@@ -90,6 +90,33 @@ describe('SettingsModal', () => {
     }));
   });
 
+  test('calls onRestartDongle when clicking Restart Device button and displays feedback', async () => {
+    const handleRestartDongle = jest.fn().mockResolvedValue({ success: true });
+    render(
+      <SettingsModal
+        isOpen={true}
+        initialTab="dongle"
+        onClose={jest.fn()}
+        onSaveDongle={jest.fn()}
+        onRestartDongle={handleRestartDongle}
+        onSaveStorage={jest.fn()}
+        onChangePassword={jest.fn()}
+        presets={[]}
+        initialDongleConfig={mockDongleConfig}
+      />
+    );
+
+    const restartBtn = screen.getByRole('button', { name: /Restart Device/i });
+    expect(restartBtn).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(restartBtn);
+    });
+
+    expect(handleRestartDongle).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText(/Device restarted successfully/i)).toBeInTheDocument();
+  });
+
   test('validates frequency ranges correctly and displays error alert in UI when frequency exceeds Ham/Airband range', () => {
     const handleSavePreset = jest.fn();
     render(

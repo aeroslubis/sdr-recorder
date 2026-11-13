@@ -237,3 +237,18 @@ def test_auto_squelch_endpoint(client):
             data = resp.json()
             assert data["squelch_threshold"] == -45.0
             assert data["squelch_l"] == 385
+
+
+def test_radio_restart_device(client):
+    login_resp = client.post("/api/auth/login", json={"username": "admin", "password": "12345"})
+    token = login_resp.json()["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    from unittest.mock import patch, AsyncMock
+    with patch.object(client.app.state.receiver, "restart", AsyncMock(return_value=True)):
+        resp = client.post("/api/radio/restart", headers=headers)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["success"] is True
+        assert "hardware_connected" in data
+        assert "is_running" in data

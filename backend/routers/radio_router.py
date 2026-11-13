@@ -79,6 +79,23 @@ async def auto_squelch_calibrate(
     return result
 
 
+@router.post("/restart")
+async def restart_radio_device(request: Request) -> Dict[str, Any]:
+    """Manually restart the RTL-SDR radio device and receiver engine."""
+    receiver = _get_receiver(request)
+    if not receiver:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Receiver service is not available",
+        )
+    success = await receiver.restart(reset_usb=True)
+    return {
+        "success": bool(success),
+        "hardware_connected": getattr(receiver, "is_hardware_connected", False),
+        "is_running": getattr(receiver, "is_running", False),
+    }
+
+
 @router.post("/tune")
 async def tune_radio(
     payload: RadioTuneRequest,
