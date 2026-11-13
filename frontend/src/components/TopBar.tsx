@@ -6,8 +6,11 @@ import {
   Sliders,
   Clock,
   User,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { SettingsTab } from './SettingsModal';
+import { useTheme, Theme } from '../context/ThemeContext';
 
 export interface TopBarProps {
   frequencyHz?: number;
@@ -19,6 +22,8 @@ export interface TopBarProps {
   username?: string;
   serverTime?: string;
   serverTimezone?: string;
+  theme?: Theme;
+  onToggleTheme?: () => void;
   onOpenSettings?: (tab: SettingsTab) => void;
   onOpenDongleConfig?: () => void;
   onOpenStorageManager?: () => void;
@@ -37,6 +42,8 @@ export const TopBar: React.FC<TopBarProps> = ({
   username = 'admin',
   serverTime,
   serverTimezone,
+  theme: propTheme,
+  onToggleTheme,
   onOpenSettings,
   onOpenDongleConfig,
   onOpenStorageManager,
@@ -44,6 +51,17 @@ export const TopBar: React.FC<TopBarProps> = ({
   onLogout,
   className = '',
 }) => {
+  const themeContext = useTheme();
+  const currentTheme = propTheme ?? themeContext.theme;
+
+  const handleToggleTheme = () => {
+    if (onToggleTheme) {
+      onToggleTheme();
+    } else {
+      themeContext.toggleTheme();
+    }
+  };
+
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -134,6 +152,21 @@ export const TopBar: React.FC<TopBarProps> = ({
             />
           </div>
         </div>
+
+        {/* Theme Toggle Button */}
+        <button
+          type="button"
+          onClick={handleToggleTheme}
+          className="flex items-center justify-center p-1.5 rounded-full bg-ash border border-charcoal hover:border-slate text-silver-mist hover:text-snow transition-colors cursor-pointer group"
+          aria-label={currentTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          title={currentTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        >
+          {currentTheme === 'dark' ? (
+            <Sun className="w-4 h-4 text-silver-mist group-hover:text-amber-400 transition-colors" />
+          ) : (
+            <Moon className="w-4 h-4 text-silver-mist group-hover:text-indigo-400 transition-colors" />
+          )}
+        </button>
 
         {/* Admin Menu Dropdown */}
         <div className="relative" ref={menuRef}>

@@ -29,4 +29,39 @@ describe('LiveSpectrumVisualizer', () => {
     expect(screen.getByText(/DISCONNECTED/i)).toBeInTheDocument();
     expect(screen.getByTestId('sdr-spectrum-canvas')).toBeInTheDocument();
   });
+
+  test('adapts canvas background and styling according to theme prop', () => {
+    const fillStyles: string[] = [];
+    const mockCtx = {
+      fillRect: vi.fn().mockImplementation(() => {
+        fillStyles.push(mockCtx.fillStyle);
+      }),
+      beginPath: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      stroke: vi.fn(),
+      fillText: vi.fn(),
+      fillStyle: '',
+      strokeStyle: '',
+    };
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(mockCtx as any);
+
+    const { rerender } = render(
+      <LiveSpectrumVisualizer
+        theme="light"
+      />
+    );
+
+    // First fillRect should paint canvas with light background color #f8fafc
+    expect(mockCtx.fillRect).toHaveBeenCalled();
+    expect(fillStyles[0]).toBe('#f8fafc');
+
+    fillStyles.length = 0;
+    rerender(
+      <LiveSpectrumVisualizer
+        theme="dark"
+      />
+    );
+    expect(fillStyles[0]).toBe('#121212');
+  });
 });

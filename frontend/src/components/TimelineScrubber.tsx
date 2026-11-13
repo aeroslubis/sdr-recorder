@@ -11,6 +11,7 @@ import {
   formatDurationSec,
 } from './timelineUtils';
 import { Calendar, ZoomIn, ZoomOut, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useTheme, Theme } from '../context/ThemeContext';
 
 export interface TransmissionInterval {
   id: number;
@@ -30,6 +31,7 @@ export interface TimelineScrubberProps {
   onSeek: (timeMs: number) => void;
   onSelectTransmission?: (id: number) => void;
   selectedTransmissionId?: number | null;
+  theme?: Theme;
   className?: string;
 }
 
@@ -40,8 +42,13 @@ export const TimelineScrubber: React.FC<TimelineScrubberProps> = ({
   onSeek,
   onSelectTransmission,
   selectedTransmissionId = null,
+  theme: propTheme,
   className = '',
 }) => {
+  const themeContext = useTheme();
+  const currentTheme = propTheme ?? themeContext.theme;
+  const isLight = currentTheme === 'light';
+
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -118,18 +125,18 @@ export const TimelineScrubber: React.FC<TimelineScrubberProps> = ({
     const height = canvas.height;
 
     // Background
-    ctx.fillStyle = '#121212'; // Obsidian
+    ctx.fillStyle = isLight ? '#f8fafc' : '#121212';
     ctx.fillRect(0, 0, width, height);
 
     const rulerHeight = 28;
     const trackHeight = height - rulerHeight;
 
     // Ruler background
-    ctx.fillStyle = '#181818';
+    ctx.fillStyle = isLight ? '#f1f5f9' : '#181818';
     ctx.fillRect(0, 0, width, rulerHeight);
 
     // Hairline divider
-    ctx.strokeStyle = '#2e2e2e'; // Charcoal
+    ctx.strokeStyle = isLight ? '#e2e8f0' : '#2e2e2e';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(0, rulerHeight);
@@ -142,7 +149,7 @@ export const TimelineScrubber: React.FC<TimelineScrubberProps> = ({
 
     // Minor ticks
     const firstMinor = Math.floor(viewStartMs / tickConfig.minorMs) * tickConfig.minorMs;
-    ctx.strokeStyle = '#2e2e2e';
+    ctx.strokeStyle = isLight ? '#cbd5e1' : '#2e2e2e';
     ctx.lineWidth = 1;
     for (let t = firstMinor; t <= viewEndMs; t += tickConfig.minorMs) {
       if (t < viewStartMs) continue;
@@ -164,21 +171,21 @@ export const TimelineScrubber: React.FC<TimelineScrubberProps> = ({
       const x = timeMsToCanvasX(t, viewStartMs, viewEndMs, width);
 
       // Major tick line
-      ctx.strokeStyle = '#4d4d4d'; // Graphite
+      ctx.strokeStyle = isLight ? '#94a3b8' : '#4d4d4d';
       ctx.beginPath();
       ctx.moveTo(x, rulerHeight - 10);
       ctx.lineTo(x, rulerHeight);
       ctx.stroke();
 
       // Tick label
-      ctx.fillStyle = '#898989'; // Smoke
+      ctx.fillStyle = isLight ? '#64748b' : '#898989';
       const label = formatMsToShortTime(t, tickConfig.showSeconds);
       // Keep labels inside bounds
       const clampedX = Math.max(18, Math.min(width - 18, x));
       ctx.fillText(label, clampedX, 4);
 
       // Subtle track grid line down the canvas
-      ctx.strokeStyle = '#1a1a1a';
+      ctx.strokeStyle = isLight ? '#e2e8f0' : '#1a1a1a';
       ctx.beginPath();
       ctx.moveTo(x, rulerHeight);
       ctx.lineTo(x, height);
@@ -201,26 +208,26 @@ export const TimelineScrubber: React.FC<TimelineScrubberProps> = ({
       const barH = Math.max(12, trackHeight * normRssi * 0.85);
       const barY = height - barH - 4;
 
-      // Phosphor Green styling (#3ecf8e)
+      // Transmission bar styling
       if (isSelected) {
-        ctx.fillStyle = '#fafafa'; // White highlight for selected
+        ctx.fillStyle = isLight ? '#0f172a' : '#fafafa'; // Highlight for selected
         ctx.fillRect(x1 - 1, barY - 2, blockWidth + 2, barH + 4);
-        ctx.fillStyle = '#3ecf8e'; // Phosphor green
+        ctx.fillStyle = isLight ? '#059669' : '#3ecf8e';
         ctx.fillRect(x1, barY, blockWidth, barH);
       } else {
         // Normal transmission block
-        ctx.fillStyle = '#3ecf8e';
+        ctx.fillStyle = isLight ? '#059669' : '#3ecf8e';
         ctx.fillRect(x1, barY, blockWidth, barH);
 
         // Peak highlight top cap
-        ctx.fillStyle = '#00c573'; // Mint pulse
+        ctx.fillStyle = isLight ? '#10b981' : '#00c573';
         ctx.fillRect(x1, barY, blockWidth, Math.min(3, barH));
       }
     }
 
     // Render Hover Line
     if (hoverState && hoverState.x >= 0 && hoverState.x <= width) {
-      ctx.strokeStyle = 'rgba(250, 250, 250, 0.4)';
+      ctx.strokeStyle = isLight ? 'rgba(15, 23, 42, 0.4)' : 'rgba(250, 250, 250, 0.4)';
       ctx.lineWidth = 1;
       ctx.setLineDash([3, 3]);
       ctx.beginPath();
@@ -235,7 +242,7 @@ export const TimelineScrubber: React.FC<TimelineScrubberProps> = ({
       const playheadX = timeMsToCanvasX(currentTimeMs, viewStartMs, viewEndMs, width);
 
       // Playhead vertical line
-      ctx.strokeStyle = '#ef4444'; // Red playhead
+      ctx.strokeStyle = isLight ? '#dc2626' : '#ef4444';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.moveTo(playheadX, 0);
@@ -243,7 +250,7 @@ export const TimelineScrubber: React.FC<TimelineScrubberProps> = ({
       ctx.stroke();
 
       // Top indicator triangle/diamond
-      ctx.fillStyle = '#3ecf8e'; // Phosphor green head
+      ctx.fillStyle = isLight ? '#059669' : '#3ecf8e';
       ctx.beginPath();
       ctx.moveTo(playheadX - 5, 0);
       ctx.lineTo(playheadX + 5, 0);
@@ -252,7 +259,7 @@ export const TimelineScrubber: React.FC<TimelineScrubberProps> = ({
       ctx.fill();
 
       // Small white center dot
-      ctx.fillStyle = '#fafafa';
+      ctx.fillStyle = isLight ? '#ffffff' : '#fafafa';
       ctx.beginPath();
       ctx.arc(playheadX, 10, 2, 0, Math.PI * 2);
       ctx.fill();
@@ -264,6 +271,7 @@ export const TimelineScrubber: React.FC<TimelineScrubberProps> = ({
     selectedTransmissionId,
     hoverState,
     currentTimeMs,
+    isLight,
   ]);
 
   // Keep canvas resolution synced to container width

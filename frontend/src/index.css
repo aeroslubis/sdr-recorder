@@ -3,7 +3,21 @@
 @tailwind utilities;
 
 :root {
-  /* Supabase Dark Theme Tokens */
+  /* Dark Theme Tokens (Default) */
+  --color-obsidian-rgb: 18 18 18;
+  --color-ash-rgb: 36 36 36;
+  --color-charcoal-rgb: 46 46 46;
+  --color-slate-rgb: 57 57 57;
+  --color-graphite-rgb: 77 77 77;
+  --color-smoke-rgb: 137 137 137;
+  --color-silver-mist-rgb: 180 180 180;
+  --color-snow-rgb: 250 250 250;
+  --color-phosphor-green-rgb: 62 207 142;
+  --color-mint-pulse-rgb: 0 197 115;
+  --color-forest-depth-rgb: 31 75 55;
+  --color-midnight-emerald-rgb: 0 98 57;
+
+  /* Hex aliases for direct CSS var usage */
   --color-phosphor-green: #3ecf8e;
   --color-mint-pulse: #00c573;
   --color-forest-depth: #1f4b37;
@@ -82,9 +96,52 @@
   --shadow-sm: rgba(0, 0, 0, 0.1) 0px 4px 6px -1px, rgba(0, 0, 0, 0.1) 0px 2px 4px -2px;
 
   /* Surfaces */
-  --surface-obsidian-canvas: #121212;
-  --surface-ash-card: #242424;
-  --surface-charcoal-border: #2e2e2e;
+  --surface-obsidian-canvas: var(--color-obsidian);
+  --surface-ash-card: var(--color-ash);
+  --surface-charcoal-border: var(--color-charcoal);
+
+  /* Scrollbar */
+  --scrollbar-track: #121212;
+  --scrollbar-thumb: #2e2e2e;
+  --scrollbar-thumb-hover: #4d4d4d;
+}
+
+:root.light,
+html.light,
+body.light,
+[data-theme="light"] {
+  /* Light Theme Tokens */
+  --color-obsidian-rgb: 248 250 252;
+  --color-ash-rgb: 255 255 255;
+  --color-charcoal-rgb: 226 232 240;
+  --color-slate-rgb: 203 213 225;
+  --color-graphite-rgb: 148 163 184;
+  --color-smoke-rgb: 100 116 139;
+  --color-silver-mist-rgb: 51 65 85;
+  --color-snow-rgb: 15 23 42;
+  --color-phosphor-green-rgb: 5 150 105;
+  --color-mint-pulse-rgb: 16 185 129;
+  --color-forest-depth-rgb: 209 250 229;
+  --color-midnight-emerald-rgb: 167 243 208;
+
+  --color-phosphor-green: #059669;
+  --color-mint-pulse: #10b981;
+  --color-forest-depth: #d1fae5;
+  --color-midnight-emerald: #a7f3d0;
+  --color-snow: #0f172a;
+  --color-silver-mist: #334155;
+  --color-smoke: #64748b;
+  --color-graphite: #94a3b8;
+  --color-slate: #cbd5e1;
+  --color-charcoal: #e2e8f0;
+  --color-ash: #ffffff;
+  --color-obsidian: #f8fafc;
+
+  --shadow-sm: rgba(0, 0, 0, 0.05) 0px 1px 3px 0px, rgba(0, 0, 0, 0.05) 0px 1px 2px -1px;
+
+  --scrollbar-track: #f1f5f9;
+  --scrollbar-thumb: #cbd5e1;
+  --scrollbar-thumb-hover: #94a3b8;
 }
 
 html, body, #root {
@@ -101,23 +158,24 @@ body {
   letter-spacing: -0.007em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-/* Custom scrollbar for dark theme */
+/* Custom scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #121212;
+  background: var(--scrollbar-track);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #2e2e2e;
+  background: var(--scrollbar-thumb);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #4d4d4d;
+  background: var(--scrollbar-thumb-hover);
 }

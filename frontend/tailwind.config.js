@@ -1,24 +1,34 @@
 /** @type {import('tailwindcss').Config} */
+function withOpacity(variableName) {
+  return ({ opacityValue }) => {
+    if (opacityValue !== undefined) {
+      return `rgb(var(${variableName}) / ${opacityValue})`;
+    }
+    return `rgb(var(${variableName}))`;
+  };
+}
+
 export default {
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
-        obsidian: '#121212',
-        ash: '#242424',
-        charcoal: '#2e2e2e',
-        slate: '#393939',
-        graphite: '#4d4d4d',
-        smoke: '#898989',
-        'silver-mist': '#b4b4b4',
-        snow: '#fafafa',
-        'phosphor-green': '#3ecf8e',
-        'mint-pulse': '#00c573',
-        'forest-depth': '#1f4b37',
-        'midnight-emerald': '#006239',
+        obsidian: withOpacity('--color-obsidian-rgb'),
+        ash: withOpacity('--color-ash-rgb'),
+        charcoal: withOpacity('--color-charcoal-rgb'),
+        slate: withOpacity('--color-slate-rgb'),
+        graphite: withOpacity('--color-graphite-rgb'),
+        smoke: withOpacity('--color-smoke-rgb'),
+        'silver-mist': withOpacity('--color-silver-mist-rgb'),
+        snow: withOpacity('--color-snow-rgb'),
+        'phosphor-green': withOpacity('--color-phosphor-green-rgb'),
+        'mint-pulse': withOpacity('--color-mint-pulse-rgb'),
+        'forest-depth': withOpacity('--color-forest-depth-rgb'),
+        'midnight-emerald': withOpacity('--color-midnight-emerald-rgb'),
       },
       fontFamily: {
         circular: ['Circular', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'sans-serif'],

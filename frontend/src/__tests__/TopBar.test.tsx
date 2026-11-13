@@ -62,4 +62,34 @@ describe('TopBar', () => {
     fireEvent.click(screen.getByText(/Sign Out/i));
     expect(handleLogout).toHaveBeenCalledTimes(1);
   });
+
+  test('renders theme toggle button with sun/moon icon and handles click', () => {
+    const handleToggleTheme = jest.fn();
+
+    const { rerender } = render(
+      <TopBar
+        theme="dark"
+        onToggleTheme={handleToggleTheme}
+      />
+    );
+
+    const toggleButton = screen.getByRole('button', { name: /switch to light mode/i });
+    expect(toggleButton).toBeInTheDocument();
+    expect(toggleButton.querySelector('svg')).toBeInTheDocument();
+
+    fireEvent.click(toggleButton);
+    expect(handleToggleTheme).toHaveBeenCalledTimes(1);
+
+    // Re-render in light mode
+    rerender(
+      <TopBar
+        theme="light"
+        onToggleTheme={handleToggleTheme}
+      />
+    );
+
+    const lightToggleButton = screen.getByRole('button', { name: /switch to dark mode/i });
+    expect(lightToggleButton).toBeInTheDocument();
+    expect(lightToggleButton.querySelector('svg')).toBeInTheDocument();
+  });
 });

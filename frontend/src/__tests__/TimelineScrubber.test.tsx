@@ -120,6 +120,53 @@ describe('PlaybackControls Component', () => {
     fireEvent.click(speed2x);
     expect(handleSpeed).toHaveBeenCalledWith(2.0);
   });
+
+  test('adapts canvas background and styling according to theme prop', () => {
+    const fillStyles: string[] = [];
+    const mockCtx = {
+      fillRect: vi.fn().mockImplementation(() => {
+        fillStyles.push(mockCtx.fillStyle);
+      }),
+      beginPath: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      stroke: vi.fn(),
+      fillText: vi.fn(),
+      setLineDash: vi.fn(),
+      closePath: vi.fn(),
+      fill: vi.fn(),
+      arc: vi.fn(),
+      fillStyle: '',
+      strokeStyle: '',
+    };
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(mockCtx as any);
+
+    const { rerender } = render(
+      <TimelineScrubber
+        date="2026-10-13"
+        currentTimeMs={3600000}
+        transmissions={[]}
+        onSeek={vi.fn()}
+        theme="light"
+      />
+    );
+
+    expect(mockCtx.fillRect).toHaveBeenCalled();
+    // In light theme, background should be #f8fafc
+    expect(fillStyles[0]).toBe('#f8fafc');
+
+    fillStyles.length = 0;
+    rerender(
+      <TimelineScrubber
+        date="2026-10-13"
+        currentTimeMs={3600000}
+        transmissions={[]}
+        onSeek={vi.fn()}
+        theme="dark"
+      />
+    );
+    expect(fillStyles[0]).toBe('#121212');
+  });
 });
 
 describe('WebAudioPlayer DSP Engine', () => {

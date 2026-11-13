@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Activity } from 'lucide-react';
+import { useTheme, Theme } from '../context/ThemeContext';
 
 export interface LiveSpectrumVisualizerProps {
   frequencyHz?: number;
@@ -8,6 +9,7 @@ export interface LiveSpectrumVisualizerProps {
   rssi?: number;
   hardwareConnected?: boolean;
   analyserNode?: AnalyserNode | null;
+  theme?: Theme;
   className?: string;
 }
 
@@ -18,11 +20,17 @@ export const LiveSpectrumVisualizer: React.FC<LiveSpectrumVisualizerProps> = ({
   rssi = -100.0,
   hardwareConnected = true,
   analyserNode = null,
+  theme: propTheme,
   className = '',
 }) => {
+  const themeContext = useTheme();
+  const currentTheme = propTheme ?? themeContext.theme;
+  const isLight = currentTheme === 'light';
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animFrameRef = useRef<number | null>(null);
   const peakHoldRef = useRef<number[]>([]);
+  const renderRef = useRef<() => void>();
   const stateRef = useRef({
     frequencyHz,
     modulation,
@@ -30,6 +38,7 @@ export const LiveSpectrumVisualizer: React.FC<LiveSpectrumVisualizerProps> = ({
     rssi,
     hardwareConnected,
     analyserNode,
+    isLight,
   });
 
   // Keep stateRef fresh without tearing down animation loop
@@ -41,8 +50,10 @@ export const LiveSpectrumVisualizer: React.FC<LiveSpectrumVisualizerProps> = ({
       rssi,
       hardwareConnected,
       analyserNode,
+      isLight,
     };
-  });
+    renderRef.current?.();
+  }, [frequencyHz, modulation, squelchOpen, rssi, hardwareConnected, analyserNode, isLight]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -60,6 +71,7 @@ export const LiveSpectrumVisualizer: React.FC<LiveSpectrumVisualizerProps> = ({
         rssi: curRssi = -100.0,
         hardwareConnected: curHwConnected,
         analyserNode: curAnalyser,
+        isLight: curIsLight,
       } = stateRef.current;
 
       const width = canvas.width;
@@ -67,7 +79,7 @@ export const LiveSpectrumVisualizer: React.FC<LiveSpectrumVisualizerProps> = ({
       const rulerHeight = 22;
       const plotHeight = height - rulerHeight;
 
-      ctx.fillStyle = '#121212'; // Obsidian background
+      ctx.fillStyle = curIsLight ? '#f8fafc' : '#121212'; // Canvas background
       ctx.fillRect(0, 0, width, height);
 
       // Channel Filter Bandwidth Shading around center
@@ -78,21 +90,21 @@ export const LiveSpectrumVisualizer: React.FC<LiveSpectrumVisualizerProps> = ({
       const bwWidth = width * bwRatio;
       const bwX1 = (width - bwWidth) / 2;
 
-      ctx.fillStyle = 'rgba(62, 207, 142, 0.05)';
+      ctx.fillStyle = curIsLight ? 'rgba(5, 150, 105, 0.08)' : 'rgba(62, 207, 142, 0.05)';
       ctx.fillRect(bwX1, 0, bwWidth, plotHeight);
-      ctx.strokeStyle = 'rgba(62, 207, 142, 0.22)';
+      ctx.strokeStyle = curIsLight ? 'rgba(5, 150, 105, 0.3)' : 'rgba(62, 207, 142, 0.22)';
       if (typeof ctx.strokeRect === 'function') {
         ctx.strokeRect(bwX1, 0, bwWidth, plotHeight);
       }
 
       // Filter label at top of passband
       ctx.font = '9px "JetBrains Mono", monospace';
-      ctx.fillStyle = 'rgba(62, 207, 142, 0.6)';
+      ctx.fillStyle = curIsLight ? '#059669' : 'rgba(62, 207, 142, 0.6)';
       ctx.textAlign = 'center';
       ctx.fillText(`${(filterBwHz / 1000).toFixed(1)}k ${curMod}`, width / 2, 11);
 
       // Horizontal dBFS grid lines & labels
-      ctx.strokeStyle = '#1e1e1e';
+      ctx.strokeStyle = curIsLight ? '#e2e8f0' : '#1e1e1e';
       ctx.lineWidth = 1;
       const dbMarks = [
         { label: '-20', y: plotHeight * 0.2 },
@@ -108,7 +120,7 @@ export const LiveSpectrumVisualizer: React.FC<LiveSpectrumVisualizerProps> = ({
         ctx.stroke();
 
         ctx.font = '8px "JetBrains Mono", monospace';
-        ctx.fillStyle = '#404040';
+        ctx.fillStyle = curIsLight ? '#94a3b8' : '#404040';
         ctx.textAlign = 'left';
         ctx.fillText(m.label, 4, m.y - 2);
       }
@@ -194,27 +206,33 @@ export const LiveSpectrumVisualizer: React.FC<LiveSpectrumVisualizerProps> = ({
         } else {
           if (typeof ctx.createLinearGradient === 'function') {
             const gradient = ctx.createLinearGradient(0, y, 0, plotHeight);
-            gradient.addColorStop(0, '#3ecf8e');
-            gradient.addColorStop(0.6, '#188656');
-            gradient.addColorStop(1, '#0e4a30');
+            if (curIsLight) {
+              gradient.addColorStop(0, '#059669');
+              gradient.addColorStop(0.6, '#10b981');
+              gradient.addColorStop(1, '#6ee7b7');
+            } else {
+              gradient.addColorStop(0, '#3ecf8e');
+              gradient.addColorStop(0.6, '#188656');
+              gradient.addColorStop(1, '#0e4a30');
+            }
             ctx.fillStyle = gradient;
           } else {
-            ctx.fillStyle = '#3ecf8e';
+            ctx.fillStyle = curIsLight ? '#059669' : '#3ecf8e';
           }
         }
         ctx.fillRect(x, y, barWidth, barHeight);
 
         // Peak hold marker
         const peakY = plotHeight - peakHoldRef.current[i] * plotHeight;
-        ctx.fillStyle = !curHwConnected ? '#ef4444' : '#00c573';
+        ctx.fillStyle = !curHwConnected ? '#ef4444' : (curIsLight ? '#047857' : '#00c573');
         ctx.fillRect(x, peakY - 1, barWidth, 1.5);
       }
 
       // Bottom Frequency Axis Ruler (22px)
-      ctx.fillStyle = '#161616';
+      ctx.fillStyle = curIsLight ? '#f1f5f9' : '#161616';
       ctx.fillRect(0, plotHeight, width, rulerHeight);
 
-      ctx.strokeStyle = '#282828';
+      ctx.strokeStyle = curIsLight ? '#e2e8f0' : '#282828';
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(0, plotHeight);
@@ -234,23 +252,25 @@ export const LiveSpectrumVisualizer: React.FC<LiveSpectrumVisualizerProps> = ({
 
       for (const t of ticks) {
         const tx = t.frac * width;
-        ctx.strokeStyle = t.isCenter ? '#3ecf8e' : '#383838';
+        ctx.strokeStyle = t.isCenter ? (curIsLight ? '#059669' : '#3ecf8e') : (curIsLight ? '#cbd5e1' : '#383838');
         ctx.beginPath();
         ctx.moveTo(tx, plotHeight);
         ctx.lineTo(tx, plotHeight + (t.isCenter ? 6 : 4));
         ctx.stroke();
 
         ctx.textAlign = 'center';
-        ctx.fillStyle = t.isCenter ? '#3ecf8e' : '#888888';
+        ctx.fillStyle = t.isCenter ? (curIsLight ? '#059669' : '#3ecf8e') : (curIsLight ? '#64748b' : '#888888');
         ctx.fillText(t.label, tx, plotHeight + 14);
       }
 
       animFrameRef.current = requestAnimationFrame(render);
     };
 
+    renderRef.current = render;
     render();
 
     return () => {
+      renderRef.current = undefined;
       if (animFrameRef.current) {
         cancelAnimationFrame(animFrameRef.current);
       }
