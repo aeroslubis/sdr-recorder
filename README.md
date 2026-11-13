@@ -27,14 +27,18 @@
 - [Overview & Architecture](#overview--architecture)
 - [Key Features](#key-features)
 - [Default Credentials](#default-credentials)
-- [Quickstart Setup & Commands](#quickstart-setup--commands)
-- [Deploy to VPS with Docker](#deploy-to-vps-with-docker)
+- [Panduan Instalasi Lengkap](#panduan-instalasi-lengkap)
+  - [1. Persiapan Sistem & Driver RTL-SDR (Wajib)](#1-persiapan-sistem--driver-rtl-sdr-wajib)
+  - [2. Metode A: Instalasi Manual (Bare Metal / Development)](#2-metode-a-instalasi-manual-bare-metal--development)
+  - [3. Metode B: Menggunakan Docker Run](#3-metode-b-menggunakan-docker-run)
+  - [4. Metode C: Menggunakan Docker Compose (Direkomendasikan)](#4-metode-c-menggunakan-docker-compose-direkomendasikan)
 - [Hardware SDR Configuration](#hardware-sdr-configuration)
 - [Hardware Detection & Disconnect Safeguards](#hardware-detection--disconnect-safeguards)
 - [24-Hour Timeline Scrubber & Continuous Playback](#24-hour-timeline-scrubber--continuous-playback)
 - [Storage Auto-Retention Engine](#storage-auto-retention-engine)
 - [API Reference](#api-reference)
 - [Automated Testing](#automated-testing)
+- [Troubleshooting & Solusi Masalah](#troubleshooting--solusi-masalah)
 
 ---
 
@@ -127,91 +131,292 @@ The system initializes an admin account upon first boot:
 
 ---
 
-## Quickstart Setup & Commands
+## Panduan Instalasi Lengkap
 
-### Prerequisites
-
-- Linux or macOS
-- Python 3.11+
-- Node.js 18+ & npm
-- `rtl_fm` (from `rtl-sdr` package) and `ffmpeg`
-- Physical RTL-SDR USB dongle connected to the host
-
-```bash
-# Ubuntu / Debian
-sudo apt-get update
-sudo apt-get install -y rtl-sdr ffmpeg python3-venv nodejs npm
-```
-
-### Installation & Launch
-
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/aeroslubis/sdr-recorder.git
-   cd sdr-recorder
-   ```
-
-2. **One-Command Startup:**
-   ```bash
-   ./scripts/start.sh
-   ```
-   *This script verifies the Python virtual environment, compiles the frontend bundle, and launches the server on `http://localhost:8000`.*
-
-3. **Development Mode (Separate Frontend & Backend):**
-   ```bash
-   # Terminal 1: Backend
-   source .venv/bin/activate
-   python backend/run.py --reload
-
-   # Terminal 2: Frontend (Vite Dev Server)
-   cd frontend
-   npm run dev
-   ```
+Terdapat 3 cara untuk menjalankan SDR-Recorder NVR:
+1. **[Metode A: Instalasi Manual (Bare Metal / Development)](#2-metode-a-instalasi-manual-bare-metal--development)** — Menjalankan langsung di sistem Linux tanpa container. Cocok untuk pengembangan kode, debugging, atau perangkat embedded.
+2. **[Metode B: Menggunakan Docker Run](#3-metode-b-menggunakan-docker-run)** — Menjalankan satu perintah container mandiri dengan image resmi dari Docker Hub.
+3. **[Metode C: Menggunakan Docker Compose](#4-metode-c-menggunakan-docker-compose-direkomendasikan)** — **Metode yang direkomendasikan** untuk server atau VPS produksi dengan konfigurasi terstruktur, volume persisten, dan auto-restart.
 
 ---
 
-## Deploy to VPS with Docker
+### 1. Persiapan Sistem & Driver RTL-SDR (Wajib)
 
-Deploying to a Linux VPS with Docker and Docker Compose takes only 2 steps:
+Sebelum menggunakan dongle USB RTL-SDR pada sistem Linux (baik instalasi manual maupun Docker), konfigurasi driver dan hak akses USB berikut wajib dilakukan pada host:
 
-### 1. Prerequisites on VPS
-
-Ensure Docker and Docker Compose are installed:
-```bash
-sudo apt-get update && sudo apt-get install -y docker.io docker-compose-v2
-```
-
-Prevent the Linux kernel DVB-T driver from claiming the RTL-SDR dongle:
+#### A. Blacklist Driver Bawaan Kernel DVB-T
+Secara default, kernel Linux mengenali chip Realtek RTL2832U sebagai tuner TV digital (`dvb_usb_rtl28xxu`) dan menguncinya, sehingga `rtl_fm` tidak dapat mengakses raw IQ data SDR. Nonaktifkan modul tersebut:
 ```bash
 echo 'blacklist dvb_usb_rtl28xxu' | sudo tee /etc/modprobe.d/blacklist-rtlsdr.conf
 sudo rmmod dvb_usb_rtl28xxu 2>/dev/null || true
 ```
 
-### 2. Configure & Start
-
+#### B. Setup Udev Rules (Hak Akses USB)
+Agar aplikasi dapat membaca dan mengontrol perangkat USB RTL-SDR tanpa perlu root:
 ```bash
-# Clone the repository
+sudo tee /etc/udev/rules.d/20-rtlsdr.rules << 'EOF'
+SUBSYSTEM=="usb", ATTRS{idVendor}=="0bda", ATTRS{idProduct}=="2838", GROUP="plugdev", MODE="0666"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="0bda", ATTRS{idProduct}=="2832", GROUP="plugdev", MODE="0666"
+EOF
+
+sudo udevadm control --reload-rules && sudo udevadm trigger
+```
+
+#### C. Verifikasi Koneksi Hardware
+Tancapkan dongle RTL-SDR ke port USB, lalu jalankan:
+```bash
+lsusb | grep -i rtl
+rtl_test -t
+```
+*Pastikan terminal menampilkan output sukses deteksi tuner (misalnya `Found 1 device(s): ... Realtek RTL2838UHIDIR`).*
+
+---
+
+### 2. Metode A: Instalasi Manual (Bare Metal / Development)
+
+Metode ini menjalankan Python FastAPI backend dan Vite React frontend secara langsung pada host Linux.
+
+#### Kebutuhan Sistem:
+- OS: Ubuntu 22.04+, Debian 12+, Raspberry Pi OS 64-bit, atau distro Linux modern lainnya
+- Python: 3.11 atau lebih baru
+- Node.js: v18+ & npm
+- RTL-SDR tools (`rtl_fm`, `rtl_test`) & FFmpeg
+
+#### Langkah 1: Install Paket Dependensi Sistem
+```bash
+# Ubuntu / Debian / Raspberry Pi OS
+sudo apt-get update
+sudo apt-get install -y rtl-sdr ffmpeg python3-venv python3-pip nodejs npm git
+```
+
+#### Langkah 2: Clone Repository
+```bash
+git clone https://github.com/aeroslubis/sdr-recorder.git
+cd sdr-recorder
+```
+
+#### Langkah 3: Konfigurasi File Environment
+```bash
+cp .env.example .env
+# Sesuaikan parameter seperti port atau timezone jika diperlukan
+nano .env
+```
+
+#### Langkah 4: Setup Virtual Environment Python & Dependensi Backend
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+#### Langkah 5: Setup & Build Frontend
+```bash
+cd frontend
+npm install
+npm run build
+cd ..
+```
+
+#### Langkah 6: Menjalankan Aplikasi
+Pilih salah satu cara berikut sesuai kebutuhan:
+
+- **Opsi 1 — Script Startup Otomatis (Produksi Lokal):**
+  ```bash
+  ./scripts/start.sh
+  ```
+  *Script ini akan memverifikasi virtual environment, memastikan dist frontend telah dibuild, dan menjalankan server di `http://0.0.0.0:8000`.*
+
+- **Opsi 2 — Mode Development (Live Hot-Reload):**
+  ```bash
+  # Terminal 1: Backend API & SDR Ingestion
+  source .venv/bin/activate
+  python backend/run.py --reload
+
+  # Terminal 2: Frontend Vite Dev Server
+  cd frontend
+  npm run dev
+  ```
+
+- **Opsi 3 — Menjalankan sebagai Systemd Service (Background Service 24/7):**
+  Buat file `/etc/systemd/system/sdr-recorder.service`:
+  ```ini
+  [Unit]
+  Description=SDR-Recorder NVR Service
+  After=network.target
+
+  [Service]
+  Type=simple
+  User=aeros
+  WorkingDirectory=/home/aeros/workspace/agy/sdr-recorder
+  ExecStart=/home/aeros/workspace/agy/sdr-recorder/.venv/bin/python backend/run.py --host 0.0.0.0 --port 8000
+  Restart=always
+  RestartSec=5
+  Environment=PYTHONUNBUFFERED=1
+
+  [Install]
+  WantedBy=multi-user.target
+  ```
+  Aktifkan dan jalankan:
+  ```bash
+  sudo systemctl daemon-reload
+  sudo systemctl enable --now sdr-recorder
+  sudo systemctl status sdr-recorder
+  ```
+
+Akses Web UI di browser Anda: `http://localhost:8000` (atau IP server Anda) dengan login default: `admin` / `12345`.
+
+---
+
+### 3. Metode B: Menggunakan Docker Run
+
+Metode ini menjalankan container secara mandiri tanpa memerlukan instalasi dependensi Python atau Node.js pada mesin host.
+
+#### Menjalankan Image Resmi dari Docker Hub:
+```bash
+# 1. Siapkan folder penyimpanan rekaman & database di host
+mkdir -p storage
+
+# 2. Jalankan container dengan akses passthrough USB
+docker run -d \
+  --name sdr-recorder \
+  --restart unless-stopped \
+  -p 8000:8000 \
+  --privileged \
+  -v /dev/bus/usb:/dev/bus/usb \
+  -v $(pwd)/storage:/app/storage \
+  -v /etc/localtime:/etc/localtime:ro \
+  -e TZ=Asia/Jayapura \
+  -e DEFAULT_ADMIN_USERNAME=admin \
+  -e DEFAULT_ADMIN_PASSWORD=12345 \
+  putrasukarno/sdr-recorder:latest
+```
+
+#### Atau Build Image Sendiri dari Source Code:
+```bash
 git clone https://github.com/aeroslubis/sdr-recorder.git
 cd sdr-recorder
 
-# Build and start container in detached mode
-docker compose up -d --build
+# Build image lokal
+docker build -t sdr-recorder:local .
+
+# Jalankan container
+docker run -d \
+  --name sdr-recorder \
+  --restart unless-stopped \
+  -p 8000:8000 \
+  --privileged \
+  -v /dev/bus/usb:/dev/bus/usb \
+  -v $(pwd)/storage:/app/storage \
+  -v /etc/localtime:/etc/localtime:ro \
+  -e TZ=Asia/Jayapura \
+  sdr-recorder:local
 ```
 
-### 3. Verification & Monitoring
-
+#### Perintah Pemeliharaan Docker:
 ```bash
-# Check container status
+# Cek status container
+docker ps --filter name=sdr-recorder
+
+# Pantau log secara langsung
+docker logs -f sdr-recorder
+
+# Restart container
+docker restart sdr-recorder
+
+# Hentikan dan hapus container
+docker stop sdr-recorder && docker rm sdr-recorder
+```
+
+---
+
+### 4. Metode C: Menggunakan Docker Compose (Direkomendasikan)
+
+Docker Compose adalah metode paling direkomendasikan untuk deployment di server NVR atau VPS karena seluruh konfigurasi, volume disk, dan perangkat USB dikelola secara deklaratif dalam satu file.
+
+#### Langkah 1: Siapkan Folder Deployment & File `docker-compose.yml`
+Buat direktori di server Anda (contoh: `~/containers/sdr-recorder`):
+```bash
+mkdir -p ~/containers/sdr-recorder && cd ~/containers/sdr-recorder
+```
+
+Buat file `docker-compose.yml` dengan isi berikut:
+```yaml
+services:
+  sdr-recorder:
+    image: putrasukarno/sdr-recorder:latest
+    container_name: sdr-recorder
+    restart: unless-stopped
+    ports:
+      - "${SDR_PORT:-8000}:8000"
+    environment:
+      - TZ=${TZ:-Asia/Jayapura}
+      - JWT_SECRET=${JWT_SECRET:-sdr-recorder-secret-key-change-in-production}
+      - DEFAULT_ADMIN_USERNAME=${DEFAULT_ADMIN_USERNAME:-admin}
+      - DEFAULT_ADMIN_PASSWORD=${DEFAULT_ADMIN_PASSWORD:-12345}
+      - DEFAULT_FREQUENCY_HZ=${DEFAULT_FREQUENCY_HZ:-118200000}
+      - DEFAULT_MODULATION=${DEFAULT_MODULATION:-AM}
+      - DEFAULT_SQUELCH_THRESHOLD=${DEFAULT_SQUELCH_THRESHOLD:--42.0}
+      - DEFAULT_AUDIO_FORMAT=${DEFAULT_AUDIO_FORMAT:-opus}
+      - DEFAULT_RETENTION_DAYS=${DEFAULT_RETENTION_DAYS:-14}
+      - DEFAULT_MAX_DISK_USAGE_PERCENT=${DEFAULT_MAX_DISK_USAGE_PERCENT:-90}
+    volumes:
+      # Data database SQLite dan audio rekaman tersimpan persisten di host
+      - ./storage:/app/storage
+      # Sinkronisasi waktu container dengan waktu sistem host
+      - /etc/localtime:/etc/localtime:ro
+    # Akses hardware fisik RTL-SDR USB dongle
+    privileged: true
+    devices:
+      - /dev/bus/usb:/dev/bus/usb
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+```
+
+> *(Opsional)* Buat file `.env` di sebelah `docker-compose.yml` jika ingin mengubah port atau timezone tanpa mengedit berkas compose:
+> ```bash
+> cat << 'EOF' > .env
+> SDR_PORT=8000
+> TZ=Asia/Jayapura
+> DEFAULT_ADMIN_USERNAME=admin
+> DEFAULT_ADMIN_PASSWORD=12345
+> EOF
+> ```
+
+#### Langkah 2: Menjalankan Container
+```bash
+# 1. Unduh image terbaru dari Docker Hub
+docker compose pull
+
+# 2. Jalankan container di latar belakang
+docker compose up -d
+```
+
+#### Langkah 3: Verifikasi Status & Log
+```bash
+# Pastikan container berstatus Up (healthy)
 docker compose ps
 
-# View live container logs
+# Periksa log aktivitas
 docker compose logs -f
 
-# Check health endpoint
+# Uji health check API
 curl http://localhost:8000/api/health
 ```
 
-The application will be accessible at `http://<your-vps-ip>:8000` with default credentials `admin` / `12345`. All database data and audio recordings are persisted in `./storage` on the host.
+#### Langkah 4: Cara Update ke Versi Terbaru
+Ketika ada update versi baru di Docker Hub, lakukan update dengan cepat tanpa downtime panjang:
+```bash
+cd ~/containers/sdr-recorder
+docker compose pull
+docker compose up -d
+```
+Docker Compose akan otomatis mengunduh layer baru dan membuat ulang container. Database SQLite serta seluruh rekaman di folder `./storage` tetap aman dan utuh.
+
+---
 
 ---
 
@@ -323,3 +528,34 @@ Run the complete test suite across backend unit tests, frontend components, and 
 # 2. Run React frontend Vitest suite
 cd frontend && npm test -- --run
 ```
+
+---
+
+## Troubleshooting & Solusi Masalah
+
+### 1. `usb_claim_interface error -6` atau Device Busy
+- **Penyebab**: Kernel Linux secara otomatis memuat modul DVB-T (`dvb_usb_rtl28xxu`).
+- **Solusi**:
+  ```bash
+  echo 'blacklist dvb_usb_rtl28xxu' | sudo tee /etc/modprobe.d/blacklist-rtlsdr.conf
+  sudo rmmod dvb_usb_rtl28xxu 2>/dev/null || true
+  ```
+  Cabut dan colokkan kembali dongle USB.
+
+### 2. Status di WebUI Menampilkan `● OFFLINE` atau No SDR Hardware Connected
+- **Penyebab**: Perangkat USB belum terbaca oleh container atau hak akses udev belum diterapkan.
+- **Solusi**:
+  1. Periksa apakah dongle terdeteksi di host: `lsusb | grep -i rtl`.
+  2. Jika menggunakan Docker Compose, pastikan opsi `privileged: true` dan volume `- /dev/bus/usb:/dev/bus/usb` aktif di `docker-compose.yml`.
+  3. Buka popup **Dongle Settings** (ikon gerigi di samping indikator frekuensi) pada tab **Dongle**, lalu klik tombol **Restart Device** untuk memulai ulang proses `rtl_fm`.
+
+### 3. Port USB Mengalami Timeout (`error -110: setup device timeout`)
+- **Penyebab**: Hub USB kelebihan beban atau sempat mengalami hardware reset berulang.
+- **Solusi**:
+  Cabut dongle RTL-SDR dari port USB selama 3 detik, lalu tancapkan kembali ke port USB lain (disarankan port langsung di motherboard / port bertenaga, bukan USB hub pasif).
+
+### 4. Audio Patah-Patah atau Beban CPU Tinggi
+- **Penyebab**: Format audio default WAV menghasilkan file besar tanpa kompresi, atau browser client kewalahan me-render animasi.
+- **Solusi**:
+  - Gunakan format audio **Opus** (default) yang sangat ringan dan efisien.
+  - SDR-Recorder telah dioptimasi dengan pembatalan request animation frame (`cancelAnimationFrame`) pada spektrum visualizer untuk rendering 60 FPS yang mulus.
