@@ -642,7 +642,7 @@ class SDRReceiver:
         self._current_transmission_start = None
 
     async def restart(self, reset_usb: bool = False) -> bool:
-        """Restarts the receiver engine, optionally issuing a USB port hardware reset."""
+        """Restarts the receiver engine and rtl_fm subprocess cleanly."""
         try:
             await self.stop()
             if reset_usb:
@@ -652,7 +652,7 @@ class SDRReceiver:
                 except Exception as e:
                     logger.debug(f"USB reset during restart skipped or failed: {e}")
             else:
-                await asyncio.sleep(0.15)
+                await asyncio.sleep(0.3)
             await self.start()
             return bool(self._running and self._is_hardware_connected)
         except Exception as e:

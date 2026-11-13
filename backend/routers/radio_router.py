@@ -88,7 +88,7 @@ async def restart_radio_device(request: Request) -> Dict[str, Any]:
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Receiver service is not available",
         )
-    success = await receiver.restart(reset_usb=True)
+    success = await receiver.restart(reset_usb=False)
     return {
         "success": bool(success),
         "hardware_connected": getattr(receiver, "is_hardware_connected", False),
