@@ -10,3 +10,5 @@ venv/
 *.db-wal
 *.db-shm
 .pytest_cache/
+.worktrees/
+worktrees/
