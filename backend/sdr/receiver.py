@@ -100,7 +100,7 @@ def get_available_devices() -> List[Dict[str, Any]]:
     """
     Enumerate RTL-SDR hardware devices connected to the host using rtl_test.
     Returns a list of device dictionaries: [{"index": int, "name": str, "available": bool}].
-    If no devices are detected or rtl_test is unavailable, returns a fallback Virtual Simulator device.
+    If no devices are detected or rtl_test is unavailable, returns an empty list.
     """
     rtl_test_bin = shutil.which("rtl_test")
     devices: List[Dict[str, Any]] = []

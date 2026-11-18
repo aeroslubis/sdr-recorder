@@ -113,7 +113,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   // Devices enumeration
   const [devices, setDevices] = useState<DeviceItem[]>([
-    { index: 0, name: 'Default RTL-SDR / Simulator', available: true },
+    { index: 0, name: 'Default RTL-SDR Dongle', available: true },
   ]);
 
   const refreshDevices = () => {

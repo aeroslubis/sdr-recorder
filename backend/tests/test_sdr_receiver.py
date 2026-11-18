@@ -5,15 +5,7 @@ import pytest
 
 from backend.dsp.squelch import calculate_rssi_dbfs, SquelchState
 from backend.sdr.dongle_config import DongleConfig
-from backend.sdr.simulator import MockSDRSimulator
 from backend.sdr.receiver import SDRReceiver, is_hardware_available
-
-
-@pytest.mark.asyncio
-async def test_simulator_generates_pcm_chunks():
-    sim = MockSDRSimulator(sample_rate=24000, chunk_ms=50, realtime=False)
-    chunk = await sim.read_chunk()
-    assert len(chunk) == 2400  # 50ms at 24000 samples/sec * 2 bytes/sample
 
 
 def test_dongle_config_parameters_and_defaults():
@@ -50,44 +42,6 @@ def test_dongle_config_parameters_and_defaults():
     assert custom.modulation == "NFM"
     assert custom.bias_tee == 1
     assert custom.ppm_offset == 15
-
-
-@pytest.mark.asyncio
-async def test_simulator_noise_floor_and_voice_burst_levels():
-    sim = MockSDRSimulator(sample_rate=24000, chunk_ms=50, realtime=False)
-
-    # Noise floor chunk: should be ~ -65 dBFS (allow between -75 and -55 dBFS)
-    noise_chunk = sim.generate_noise_chunk()
-    assert len(noise_chunk) == 2400
-    noise_rssi = calculate_rssi_dbfs(noise_chunk)
-    assert -75.0 <= noise_rssi <= -55.0
-
-    # Voice burst chunk: simulated radio bursts between -38 and -25 dBFS
-    burst_chunk = sim.generate_burst_chunk()
-    assert len(burst_chunk) == 2400
-    burst_rssi = calculate_rssi_dbfs(burst_chunk)
-    assert -39.0 <= burst_rssi <= -24.0
-
-
-@pytest.mark.asyncio
-async def test_simulator_periodic_pattern_and_manual_triggers():
-    sim = MockSDRSimulator(sample_rate=24000, chunk_ms=50, realtime=False)
-    
-    # By default, simulator is in noise mode until burst occurs or triggered
-    sim.trigger_noise()
-    chunk1 = await sim.read_chunk()
-    rssi1 = calculate_rssi_dbfs(chunk1)
-    assert rssi1 < -45.0
-
-    # Trigger burst
-    sim.trigger_burst(duration_ms=200)
-    burst_chunks = []
-    for _ in range(3):
-        burst_chunks.append(await sim.read_chunk())
-    
-    # Verify burst chunks are above typical squelch threshold
-    burst_rssis = [calculate_rssi_dbfs(c) for c in burst_chunks]
-    assert any(r > -42.0 for r in burst_rssis)
 
 
 def test_build_rtl_fm_command():
