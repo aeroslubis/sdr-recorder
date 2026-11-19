@@ -36,6 +36,7 @@ describe('SettingsModal', () => {
     expect(screen.getByRole('tab', { name: /channel setup/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /recording setup/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /storage/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /interface/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /password/i })).toBeInTheDocument();
 
     // Check default dongle tab content
@@ -51,6 +52,11 @@ describe('SettingsModal', () => {
     expect(screen.getByText(/Minimum Speech Duration/i)).toBeInTheDocument();
     expect(screen.getByText(/Server Timezone/i)).toBeInTheDocument();
     expect(screen.getByText(/Enable Squelch Tail & Pop Suppression/i)).toBeInTheDocument();
+
+    // Switch to Interface tab
+    fireEvent.click(screen.getByRole('tab', { name: /interface/i }));
+    expect(screen.getByText(/Live SDR Spectrum Display/i)).toBeInTheDocument();
+    expect(screen.getByText(/General Interface & Audio/i)).toBeInTheDocument();
 
     // Switch to Storage tab
     fireEvent.click(screen.getByRole('tab', { name: /storage/i }));

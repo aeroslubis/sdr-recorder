@@ -14,11 +14,14 @@ import {
   RotateCw,
   Mic,
   Clock,
+  Monitor,
+  Activity,
 } from 'lucide-react';
 import { PresetItem } from './RadioTuningPanel';
 import { DongleHardwareConfig, R820T_GAIN_STEPS } from './DongleConfigModal';
+import { useUiSettings } from '../context/UiSettingsContext';
 
-export type SettingsTab = 'dongle' | 'channels' | 'recording' | 'storage' | 'password';
+export type SettingsTab = 'dongle' | 'channels' | 'recording' | 'storage' | 'password' | 'interface';
 
 export interface StorageSettings {
   retention_days: number;
@@ -110,6 +113,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   useEffect(() => {
     setActiveTab(initialTab);
   }, [initialTab, isOpen]);
+
+  // UI Settings Context hook
+  const { settings: uiSettings, updateSettings: updateUiSettings, resetSettings: resetUiSettings } = useUiSettings();
 
   // Devices enumeration
   const [devices, setDevices] = useState<DeviceItem[]>([
@@ -549,6 +555,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           >
             <HardDrive className="w-3.5 h-3.5" />
             <span>Storage</span>
+          </button>
+
+          <button
+            role="tab"
+            aria-selected={activeTab === 'interface'}
+            onClick={() => setActiveTab('interface')}
+            className={`flex items-center gap-2 py-3 px-4 border-b-2 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${
+              activeTab === 'interface'
+                ? 'border-phosphor-green text-phosphor-green'
+                : 'border-transparent text-silver-mist hover:text-snow'
+            }`}
+          >
+            <Monitor className="w-3.5 h-3.5" />
+            <span>Interface</span>
           </button>
 
           <button
@@ -1597,6 +1617,218 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </button>
               </div>
             </form>
+          )}
+
+          {/* TAB 5: INTERFACE / UI */}
+          {activeTab === 'interface' && (
+            <div className="space-y-6">
+              {/* Seksi 1: Live SDR Spectrum Visualizer */}
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <Activity className="w-4 h-4 text-phosphor-green" />
+                  <h3 className="text-sm font-medium text-snow">Live SDR Spectrum Display</h3>
+                </div>
+                <p className="text-xs text-smoke mb-4">
+                  Sesuaikan tampilan visualizer spektrum frekuensi real-time dan performa rendering canvas.
+                </p>
+
+                <div className="space-y-4 bg-ash/50 border border-charcoal rounded-cards p-4">
+                  {/* Spectrum Color Palette */}
+                  <div>
+                    <label className="block text-xs font-medium text-silver-mist mb-2">
+                      Color Palette / Skema Warna Spectrum
+                    </label>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                      {[
+                        { id: 'phosphor', name: 'Phosphor Green', colors: ['#3ecf8e', '#188656', '#0e4a30'] },
+                        { id: 'cyan', name: 'Cyber Cyan', colors: ['#06b6d4', '#0891b2', '#164e63'] },
+                        { id: 'amber', name: 'Amber CRT', colors: ['#f59e0b', '#d97706', '#78350f'] },
+                        { id: 'monochrome', name: 'Monochrome Slate', colors: ['#e2e8f0', '#94a3b8', '#334155'] },
+                      ].map((pal) => (
+                        <button
+                          key={pal.id}
+                          type="button"
+                          onClick={() => updateUiSettings({ spectrumColorMap: pal.id as any })}
+                          className={`flex flex-col gap-1.5 p-2.5 rounded-inputs border transition-all text-left cursor-pointer ${
+                            uiSettings.spectrumColorMap === pal.id
+                              ? 'bg-ash border-phosphor-green ring-1 ring-phosphor-green/30'
+                              : 'bg-obsidian/60 border-charcoal hover:border-slate'
+                          }`}
+                        >
+                          <div className="flex items-center gap-1 h-3.5">
+                            {pal.colors.map((c, i) => (
+                              <div key={i} className="flex-1 h-full rounded-sm" style={{ backgroundColor: c }} />
+                            ))}
+                          </div>
+                          <span className={`text-[11px] font-medium ${uiSettings.spectrumColorMap === pal.id ? 'text-snow' : 'text-smoke'}`}>
+                            {pal.name}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Refresh Rate (FPS) & Peak Decay */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-charcoal/60">
+                    <div>
+                      <label className="block text-xs font-medium text-silver-mist mb-1.5">
+                        Refresh Rate (FPS / Efisiensi CPU)
+                      </label>
+                      <select
+                        value={uiSettings.spectrumFps}
+                        onChange={(e) => updateUiSettings({ spectrumFps: parseInt(e.target.value, 10) as any })}
+                        className="w-full bg-obsidian border border-slate focus:border-phosphor-green rounded-inputs px-3 py-2 text-xs text-snow outline-none font-mono"
+                      >
+                        <option value={60}>Smooth (60 FPS) — Performa GPU Optimal</option>
+                        <option value={30}>Balanced (30 FPS) — Standar & Efisien CPU</option>
+                        <option value={15}>Eco (15 FPS) — Konsumsi Daya Terendah</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-silver-mist mb-1.5">
+                        Peak Hold Decay Speed
+                      </label>
+                      <select
+                        value={uiSettings.spectrumDecay}
+                        onChange={(e) => updateUiSettings({ spectrumDecay: e.target.value as any })}
+                        className="w-full bg-obsidian border border-slate focus:border-phosphor-green rounded-inputs px-3 py-2 text-xs text-snow outline-none font-mono"
+                      >
+                        <option value="fast">Fast (Cepat Meluruh)</option>
+                        <option value="normal">Normal (Seimbang)</option>
+                        <option value="slow">Slow (Penahan Puncak Panjang)</option>
+                        <option value="off">Off (Nonaktifkan Peak Line)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Toggles: Passband Overlay & Multichannel Freeze */}
+                  <div className="space-y-2.5 pt-3 border-t border-charcoal/60">
+                    <label className="flex items-start gap-2.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={uiSettings.spectrumPassband}
+                        onChange={(e) => updateUiSettings({ spectrumPassband: e.target.checked })}
+                        className="mt-0.5 accent-phosphor-green"
+                      />
+                      <div>
+                        <span className="text-xs text-snow font-medium">Tampilkan Filter Passband Overlay</span>
+                        <p className="text-[11px] text-smoke">
+                          Memberi sorotan warna pada bidang demodulasi sinyal di tengah spektrum (6 kHz AM / 12.5 kHz NFM).
+                        </p>
+                      </div>
+                    </label>
+
+                    <label className="flex items-start gap-2.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={uiSettings.spectrumFreezeOnHop}
+                        onChange={(e) => updateUiSettings({ spectrumFreezeOnHop: e.target.checked })}
+                        className="mt-0.5 accent-phosphor-green"
+                      />
+                      <div>
+                        <span className="text-xs text-snow font-medium">Hanya Update Spektrum Saat Ada Percakapan (Multichannel Hopping)</span>
+                        <p className="text-[11px] text-smoke">
+                          Mencegah grafik spektrum dan skala frekuensi berkedip/melompat saat radio sedang scanning cepat tanpa percakapan aktif.
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Seksi 2: General Interface & Audio Preferences */}
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <Sliders className="w-4 h-4 text-phosphor-green" />
+                  <h3 className="text-sm font-medium text-snow">General Interface & Audio</h3>
+                </div>
+                <p className="text-xs text-smoke mb-4">
+                  Pengaturan format waktu, kepadatan tampilan timeline, dan preferensi audio player.
+                </p>
+
+                <div className="space-y-4 bg-ash/50 border border-charcoal rounded-cards p-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Time Format */}
+                    <div>
+                      <label className="block text-xs font-medium text-silver-mist mb-1.5">
+                        Format Waktu Jam
+                      </label>
+                      <select
+                        value={uiSettings.timeFormat}
+                        onChange={(e) => updateUiSettings({ timeFormat: e.target.value as any })}
+                        className="w-full bg-obsidian border border-slate focus:border-phosphor-green rounded-inputs px-3 py-2 text-xs text-snow outline-none font-mono"
+                      >
+                        <option value="24h">24-Hour (15:04:05)</option>
+                        <option value="12h">12-Hour (03:04:05 PM)</option>
+                      </select>
+                    </div>
+
+                    {/* Timeline Density */}
+                    <div>
+                      <label className="block text-xs font-medium text-silver-mist mb-1.5">
+                        Tinggi Timeline Scrubber
+                      </label>
+                      <select
+                        value={uiSettings.timelineDensity}
+                        onChange={(e) => updateUiSettings({ timelineDensity: e.target.value as any })}
+                        className="w-full bg-obsidian border border-slate focus:border-phosphor-green rounded-inputs px-3 py-2 text-xs text-snow outline-none font-mono"
+                      >
+                        <option value="standard">Standard (180px) — Luas & Detail</option>
+                        <option value="compact">Compact (130px) — Lebih Hemat Ruang Layar</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Seconds Toggle & Continuous Playback */}
+                  <div className="space-y-2.5 pt-3 border-t border-charcoal/60">
+                    <label className="flex items-start gap-2.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={uiSettings.showSeconds}
+                        onChange={(e) => updateUiSettings({ showSeconds: e.target.checked })}
+                        className="mt-0.5 accent-phosphor-green"
+                      />
+                      <div>
+                        <span className="text-xs text-snow font-medium">Tampilkan Detik pada Jam Header</span>
+                        <p className="text-[11px] text-smoke">
+                          Menampilkan detik (`HH:mm:ss`) atau format ringkas tanpa detik (`HH:mm`).
+                        </p>
+                      </div>
+                    </label>
+
+                    <label className="flex items-start gap-2.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={uiSettings.continuousPlayback}
+                        onChange={(e) => updateUiSettings({ continuousPlayback: e.target.checked })}
+                        className="mt-0.5 accent-phosphor-green"
+                      />
+                      <div>
+                        <span className="text-xs text-snow font-medium">Continuous Call Playback (Auto-play Next)</span>
+                        <p className="text-[11px] text-smoke">
+                          Otomatis memutar rekaman transmisi berikutnya dalam antrian log panggilan setelah rekaman saat ini selesai.
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Reset to Defaults Footer */}
+              <div className="flex justify-between items-center pt-2 border-t border-charcoal">
+                <span className="text-[11px] text-smoke">
+                  Semua pengaturan UI disimpan otomatis di browser (localStorage).
+                </span>
+                <button
+                  type="button"
+                  onClick={resetUiSettings}
+                  className="px-3.5 py-1.5 bg-ash border border-charcoal hover:border-slate text-silver-mist hover:text-snow rounded-pill text-xs transition-colors cursor-pointer"
+                >
+                  Reset to Defaults
+                </button>
+              </div>
+            </div>
           )}
         </div>
       </div>
