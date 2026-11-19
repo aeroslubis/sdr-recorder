@@ -1,6 +1,7 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { vi } from 'vitest';
 import { DashboardLayout } from '../components/DashboardLayout';
+import { UiSettingsProvider } from '../context/UiSettingsContext';
 
 // Mock useAuth
 vi.mock('../context/AuthContext', () => ({
@@ -126,5 +127,29 @@ describe('DashboardLayout Unified Standard Layout', () => {
     expect(screen.getByTestId('sdr-spectrum-canvas')).toBeInTheDocument();
     expect(screen.getByTestId('timeline-canvas')).toBeInTheDocument();
     expect(screen.getByText(/call log history/i)).toBeInTheDocument();
+  });
+
+  test('applies compact timeline density and 12-hour time format from UI settings', async () => {
+    localStorage.setItem(
+      'sdr_ui_settings_v1',
+      JSON.stringify({
+        timelineDensity: 'compact',
+        timeFormat: '12h',
+        showSeconds: true,
+      })
+    );
+
+    render(
+      <UiSettingsProvider>
+        <DashboardLayout />
+      </UiSettingsProvider>
+    );
+
+    const timelineContainer = screen.getByTestId('timeline-scrubber-container');
+    expect(timelineContainer).toHaveClass('max-h-[130px]');
+
+    await waitFor(() => {
+      expect(screen.getByText(/02:00:00 PM/i)).toBeInTheDocument();
+    });
   });
 });

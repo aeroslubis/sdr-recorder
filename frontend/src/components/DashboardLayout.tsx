@@ -11,6 +11,7 @@ import { DongleHardwareConfig } from './DongleConfigModal';
 import { WebAudioPlayer } from '../audio/WebAudioPlayer';
 import { formatDate } from './HistoryDatePicker';
 import { NoDeviceModal } from './NoDeviceModal';
+import { useUiSettings } from '../context/UiSettingsContext';
 
 export interface DashboardLayoutProps {
   className?: string;
@@ -18,6 +19,7 @@ export interface DashboardLayoutProps {
 
 export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = '' }) => {
   const { user, token, logout } = useAuth();
+  const { settings: uiSettings } = useUiSettings();
 
   // Selected date for playback
   const [selectedDate, setSelectedDate] = useState<string>(() => formatDate(new Date()));
@@ -57,7 +59,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
         }
       }
     } catch {}
-    return 0.8;
+    return uiSettings.defaultVolume ?? 0.8;
   });
   const volumeRef = useRef<number>(volume);
   const savedVolumeRef = useRef<number>(volume > 0 ? volume : 0.8);
@@ -95,7 +97,15 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
   const chronologicalCallsRef = useRef<CallLogItem[]>([]);
   const selectedCallIdRef = useRef<number | null>(null);
   const isContinuousPlayRef = useRef<boolean>(false);
+  const continuousSettingRef = useRef<boolean>(uiSettings.continuousPlayback);
   const handlePlayCallRef = useRef<((id: number) => Promise<void>) | null>(null);
+
+  useEffect(() => {
+    continuousSettingRef.current = uiSettings.continuousPlayback;
+    if (uiSettings.continuousPlayback) {
+      isContinuousPlayRef.current = true;
+    }
+  }, [uiSettings.continuousPlayback]);
 
   // Initialize WebAudioPlayer
   useEffect(() => {
@@ -113,7 +123,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
     };
 
     player.onEnded = () => {
-      if (isContinuousPlayRef.current) {
+      if (isContinuousPlayRef.current || continuousSettingRef.current) {
         const sorted = chronologicalCallsRef.current;
         const currId = selectedCallIdRef.current;
         const currIdx = sorted.findIndex((c) => c.id === currId);
@@ -287,6 +297,26 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Format displayed server time according to UI settings (24h/12h and seconds toggle)
+  const formattedServerTime = useMemo(() => {
+    if (!serverTimeStr || serverTimeStr.length < 5) return serverTimeStr;
+    const parts = serverTimeStr.split(':');
+    const h = parseInt(parts[0], 10);
+    const m = parts[1] || '00';
+    const s = parts[2] || '00';
+    if (isNaN(h)) return serverTimeStr;
+
+    if (uiSettings.timeFormat === '12h') {
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const h12 = h % 12 || 12;
+      const hStr = String(h12).padStart(2, '0');
+      return uiSettings.showSeconds ? `${hStr}:${m}:${s} ${ampm}` : `${hStr}:${m} ${ampm}`;
+    } else {
+      const hStr = String(h).padStart(2, '0');
+      return uiSettings.showSeconds ? `${hStr}:${m}:${s}` : `${hStr}:${m}`;
+    }
+  }, [serverTimeStr, uiSettings.timeFormat, uiSettings.showSeconds]);
 
   // Fetch timeline intervals and call log when selectedDate changes
   useEffect(() => {
@@ -516,6 +546,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
 
   const handlePlayCall = async (id: number) => {
     handleSelectTransmission(id);
+    if (uiSettings.continuousPlayback) {
+      isContinuousPlayRef.current = true;
+    }
     const authToken = token || localStorage.getItem('sdr_auth_token') || sessionStorage.getItem('sdr_auth_token') || '';
     const audioUrl = `/api/recordings/${id}/audio${authToken ? `?token=${encodeURIComponent(authToken)}` : ''}`;
     if (audioPlayerRef.current) {
@@ -746,7 +779,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
         diskUsedGB={diskUsedGB}
         diskTotalGB={diskTotalGB}
         username={user?.username || 'admin'}
-        serverTime={serverTimeStr}
+        serverTime={formattedServerTime}
         serverTimezone={serverTzStr}
         onOpenSettings={(tab) => {
           setSettingsTab(tab);
@@ -821,7 +854,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
           </div>
 
           {/* 24-Hour Canvas Timeline Scrubber */}
-          <div className="flex-1 min-h-[160px] flex flex-col overflow-hidden">
+          <div
+            data-testid="timeline-scrubber-container"
+            className={`flex-1 ${
+              uiSettings.timelineDensity === 'compact' ? 'min-h-[120px] max-h-[130px]' : 'min-h-[160px]'
+            } flex flex-col overflow-hidden`}
+          >
             <TimelineScrubber
               date={selectedDate}
               transmissions={timelineTransmissions}
