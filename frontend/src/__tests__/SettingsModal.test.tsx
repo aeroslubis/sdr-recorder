@@ -213,4 +213,27 @@ describe('SettingsModal', () => {
       frequency_hz: 118200000,
     }));
   });
+
+  test('renders Interface tab and does not render any Logs tab', () => {
+    render(
+      <SettingsModal
+        isOpen={true}
+        initialTab="interface"
+        onClose={jest.fn()}
+        onSaveDongle={jest.fn()}
+        onSaveStorage={jest.fn()}
+        onChangePassword={jest.fn()}
+        presets={[]}
+      />
+    );
+
+    // Interface tab must exist and be selected
+    const interfaceTab = screen.getByRole('tab', { name: /interface/i });
+    expect(interfaceTab).toBeInTheDocument();
+    expect(screen.getByText(/Live SDR Spectrum Display/i)).toBeInTheDocument();
+
+    // Logs tab must NOT exist
+    expect(screen.queryByRole('tab', { name: /logs/i })).toBeNull();
+    expect(screen.queryByText(/Backend System Logs/i)).toBeNull();
+  });
 });
