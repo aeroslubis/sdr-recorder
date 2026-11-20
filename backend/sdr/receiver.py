@@ -17,6 +17,7 @@ from backend.dsp.squelch import SquelchEvaluator, SquelchResult, SquelchState
 from backend.sdr.dongle_config import DongleConfig
 
 logger = logging.getLogger(__name__)
+dongle_logger = logging.getLogger("backend.sdr.dongle")
 
 
 def is_hardware_available(device_index: int = 0) -> bool:
@@ -238,6 +239,9 @@ class SDRReceiver:
         # Hardware connection detection
         self._is_hardware_connected = is_hardware_available(self.config.device_index)
         self._last_hw_check_time: float = 0.0
+        dongle_logger.info(
+            f"RTL-SDR dongle probe: device_index={self.config.device_index}, available={self._is_hardware_connected}"
+        )
 
         # State tracking
         self._running = False
@@ -263,6 +267,24 @@ class SDRReceiver:
     @property
     def is_hardware_connected(self) -> bool:
         return self._is_hardware_connected
+
+    def _mark_hardware_disconnected(self, reason: str = "USB communication lost") -> None:
+        """Transitions hardware status to disconnected and emits a warning log once."""
+        if self._is_hardware_connected:
+            self._is_hardware_connected = False
+            rc = self._process.returncode if self._process else None
+            dongle_logger.warning(
+                f"RTL-SDR dongle disconnected on device_index={self.config.device_index} "
+                f"(returncode={rc}, reason={reason}). Reconnection worker active."
+            )
+
+    def _mark_hardware_connected(self) -> None:
+        """Transitions hardware status to connected and emits an info log once."""
+        if not self._is_hardware_connected:
+            self._is_hardware_connected = True
+            dongle_logger.info(
+                f"RTL-SDR dongle reconnected on device_index={self.config.device_index}. Respawning rtl_fm process."
+            )
 
     @property
     def state(self) -> SquelchState:
@@ -372,7 +394,7 @@ class SDRReceiver:
 
         if self._process.returncode is not None:
             if not is_hardware_available(self.config.device_index):
-                self._is_hardware_connected = False
+                self._mark_hardware_disconnected(reason="process exit")
             return b"\x00" * self.chunk_bytes
 
         # If rtl_fm is in continuous streaming mode (AM/USB/LSB or squelch disabled <= -95 dBFS)
@@ -387,7 +409,7 @@ class SDRReceiver:
                 return chunk
             except asyncio.IncompleteReadError:
                 if not is_hardware_available(self.config.device_index):
-                    self._is_hardware_connected = False
+                    self._mark_hardware_disconnected(reason="stream EOF")
                 return b"\x00" * self.chunk_bytes
             except asyncio.TimeoutError:
                 return b"\x00" * self.chunk_bytes
@@ -406,7 +428,7 @@ class SDRReceiver:
                 )
                 if not part:
                     if not is_hardware_available(self.config.device_index):
-                        self._is_hardware_connected = False
+                        self._mark_hardware_disconnected(reason="empty read")
                     break
                 buf.extend(part)
             except asyncio.TimeoutError:
@@ -531,8 +553,17 @@ class SDRReceiver:
                     stderr=asyncio.subprocess.DEVNULL,
                 )
                 self._is_hardware_connected = True
+                pid = self._process.pid if self._process else "?"
+                dongle_logger.info(
+                    f"RTL-SDR dongle connected on device_index={self.config.device_index} "
+                    f"(PID {pid}, {self.config.modulation}, {self.config.frequency_hz / 1e6:.3f} MHz, "
+                    f"squelch={self.config.squelch_threshold:.1f} dBFS)"
+                )
             except Exception as e:
                 logger.warning(f"Failed to spawn rtl_fm ({e}).")
+                dongle_logger.warning(
+                    f"RTL-SDR dongle failed to spawn rtl_fm on device_index={self.config.device_index}: {e}"
+                )
                 self._is_hardware_connected = False
 
         while self._running:
@@ -560,6 +591,9 @@ class SDRReceiver:
                         self._last_hw_check_time = now
                         if is_hardware_available(self.config.device_index):
                             logger.info(f"RTL-SDR dongle {self.config.device_index} reconnected. Restarting...")
+                            dongle_logger.info(
+                                f"RTL-SDR dongle reconnected on device_index={self.config.device_index}. Respawning rtl_fm process."
+                            )
                             try:
                                 if self._process:
                                     self._process.kill()
@@ -579,7 +613,7 @@ class SDRReceiver:
 
                 if self._process is None or self._process.returncode is not None:
                     if not is_hardware_available(self.config.device_index):
-                        self._is_hardware_connected = False
+                        self._mark_hardware_disconnected(reason="process exit")
                         continue
                     else:
                         cmd = self.build_rtl_fm_command()
@@ -598,7 +632,7 @@ class SDRReceiver:
             except asyncio.IncompleteReadError:
                 logger.warning("RTL-SDR stream reached EOF.")
                 if not is_hardware_available(self.config.device_index):
-                    self._is_hardware_connected = False
+                    self._mark_hardware_disconnected(reason="stream EOF")
                 await asyncio.sleep(0.05)
             except asyncio.CancelledError:
                 break
@@ -643,6 +677,9 @@ class SDRReceiver:
 
     async def restart(self, reset_usb: bool = False) -> bool:
         """Restarts the receiver engine and rtl_fm subprocess cleanly."""
+        dongle_logger.info(
+            f"RTL-SDR dongle restart requested via API for device_index={self.config.device_index}. Resetting process..."
+        )
         try:
             await self.stop()
             if reset_usb:
@@ -685,6 +722,12 @@ class SDRReceiver:
         self.squelch_evaluator.threshold_dbfs = new_config.squelch_threshold
         self.squelch_evaluator.hang_time_ms = new_config.hang_time_ms
         self.squelch_evaluator.pre_roll_ms = new_config.pre_roll_ms
+
+        if rf_changed:
+            dongle_logger.info(
+                f"RTL-SDR dongle tuned to {new_config.frequency_hz / 1e6:.3f} MHz "
+                f"({new_config.modulation}, squelch={new_config.squelch_threshold:.1f} dBFS)"
+            )
 
         if rf_changed and self._running:
             await self.restart()

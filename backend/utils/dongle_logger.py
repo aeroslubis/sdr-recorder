@@ -37,8 +37,18 @@ def setup_dongle_logger(storage_dir: str, log_filename: str = "dongle.log") -> l
         sh.setFormatter(formatter)
         logger.addHandler(sh)
 
+    # Remove any existing RotatingFileHandler pointing to a different path
+    existing_file_handlers = [h for h in logger.handlers if isinstance(h, RotatingFileHandler)]
+    for h in existing_file_handlers:
+        if os.path.abspath(getattr(h, "baseFilename", "")) != os.path.abspath(log_path):
+            h.close()
+            logger.removeHandler(h)
+
     # Attach RotatingFileHandler if not already present
-    has_file = any(isinstance(h, RotatingFileHandler) for h in logger.handlers)
+    has_file = any(
+        isinstance(h, RotatingFileHandler) and os.path.abspath(getattr(h, "baseFilename", "")) == os.path.abspath(log_path)
+        for h in logger.handlers
+    )
     if not has_file:
         rfh = RotatingFileHandler(
             log_path,
