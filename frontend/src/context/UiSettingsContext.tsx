@@ -12,7 +12,6 @@ export interface UiSettings {
   spectrumFps: SpectrumFps;
   spectrumDecay: SpectrumDecay;
   spectrumPassband: boolean;
-  spectrumFreezeOnHop: boolean;
 
   // General Interface & Audio
   timeFormat: TimeFormat;
@@ -27,7 +26,6 @@ export const DEFAULT_UI_SETTINGS: UiSettings = {
   spectrumFps: 30,
   spectrumDecay: 'normal',
   spectrumPassband: true,
-  spectrumFreezeOnHop: true,
 
   timeFormat: '24h',
   showSeconds: true,

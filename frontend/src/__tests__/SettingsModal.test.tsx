@@ -236,4 +236,34 @@ describe('SettingsModal', () => {
     expect(screen.queryByRole('tab', { name: /logs/i })).toBeNull();
     expect(screen.queryByText(/Backend System Logs/i)).toBeNull();
   });
+
+  test('renders Interface tab fully in English and without scanner hopping options', () => {
+    render(
+      <SettingsModal
+        isOpen={true}
+        initialTab="interface"
+        onClose={jest.fn()}
+        onSaveDongle={jest.fn()}
+        onSaveStorage={jest.fn()}
+        onChangePassword={jest.fn()}
+        presets={[]}
+      />
+    );
+
+    // English labels
+    expect(screen.getByText(/Live SDR Spectrum Display/i)).toBeInTheDocument();
+    expect(screen.getByText(/Color Palette/i)).toBeInTheDocument();
+    expect(screen.getByText(/Refresh Rate \(FPS \/ CPU Efficiency\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/Show Filter Passband Overlay/i)).toBeInTheDocument();
+    expect(screen.getByText(/General Interface & Audio Preferences/i)).toBeInTheDocument();
+    expect(screen.getByText(/Time Display Format/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Timeline Scrubber Density/i)[0]).toBeInTheDocument();
+    expect(screen.getByText(/Show Seconds in Header Clock/i)).toBeInTheDocument();
+    expect(screen.getByText(/Continuous Call Playback \(Auto-play Next\)/i)).toBeInTheDocument();
+
+    // No scanner / hopping residuals
+    expect(screen.queryByText(/Multichannel Hopping/i)).toBeNull();
+    expect(screen.queryByText(/scanning cepat/i)).toBeNull();
+    expect(screen.queryByText(/Skema Warna/i)).toBeNull();
+  });
 });

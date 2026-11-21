@@ -1622,21 +1622,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {/* TAB 5: INTERFACE / UI */}
           {activeTab === 'interface' && (
             <div className="space-y-6">
-              {/* Seksi 1: Live SDR Spectrum Visualizer */}
+              {/* Section 1: Live SDR Spectrum Visualizer */}
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <Activity className="w-4 h-4 text-phosphor-green" />
                   <h3 className="text-sm font-medium text-snow">Live SDR Spectrum Display</h3>
                 </div>
                 <p className="text-xs text-smoke mb-4">
-                  Sesuaikan tampilan visualizer spektrum frekuensi real-time dan performa rendering canvas.
+                  Configure real-time frequency spectrum display preferences and canvas rendering performance.
                 </p>
 
                 <div className="space-y-4 bg-ash/50 border border-charcoal rounded-cards p-4">
                   {/* Spectrum Color Palette */}
                   <div>
                     <label className="block text-xs font-medium text-silver-mist mb-2">
-                      Color Palette / Skema Warna Spectrum
+                      Color Palette
                     </label>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                       {[
@@ -1672,16 +1672,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-charcoal/60">
                     <div>
                       <label className="block text-xs font-medium text-silver-mist mb-1.5">
-                        Refresh Rate (FPS / Efisiensi CPU)
+                        Refresh Rate (FPS / CPU Efficiency)
                       </label>
                       <select
                         value={uiSettings.spectrumFps}
                         onChange={(e) => updateUiSettings({ spectrumFps: parseInt(e.target.value, 10) as any })}
                         className="w-full bg-obsidian border border-slate focus:border-phosphor-green rounded-inputs px-3 py-2 text-xs text-snow outline-none font-mono"
                       >
-                        <option value={60}>Smooth (60 FPS) — Performa GPU Optimal</option>
-                        <option value={30}>Balanced (30 FPS) — Standar & Efisien CPU</option>
-                        <option value={15}>Eco (15 FPS) — Konsumsi Daya Terendah</option>
+                        <option value={60}>Smooth (60 FPS) — Optimal GPU Performance</option>
+                        <option value={30}>Balanced (30 FPS) — Standard & CPU Efficient</option>
+                        <option value={15}>Eco (15 FPS) — Lowest Power Draw</option>
                       </select>
                     </div>
 
@@ -1694,15 +1694,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         onChange={(e) => updateUiSettings({ spectrumDecay: e.target.value as any })}
                         className="w-full bg-obsidian border border-slate focus:border-phosphor-green rounded-inputs px-3 py-2 text-xs text-snow outline-none font-mono"
                       >
-                        <option value="fast">Fast (Cepat Meluruh)</option>
-                        <option value="normal">Normal (Seimbang)</option>
-                        <option value="slow">Slow (Penahan Puncak Panjang)</option>
-                        <option value="off">Off (Nonaktifkan Peak Line)</option>
+                        <option value="fast">Fast</option>
+                        <option value="normal">Normal</option>
+                        <option value="slow">Slow (Long Peak Hold)</option>
+                        <option value="off">Off (Disable Peak Line)</option>
                       </select>
                     </div>
                   </div>
 
-                  {/* Toggles: Passband Overlay & Multichannel Freeze */}
+                  {/* Toggle: Passband Overlay */}
                   <div className="space-y-2.5 pt-3 border-t border-charcoal/60">
                     <label className="flex items-start gap-2.5 cursor-pointer">
                       <input
@@ -1712,24 +1712,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         className="mt-0.5 accent-phosphor-green"
                       />
                       <div>
-                        <span className="text-xs text-snow font-medium">Tampilkan Filter Passband Overlay</span>
+                        <span className="text-xs text-snow font-medium">Show Filter Passband Overlay</span>
                         <p className="text-[11px] text-smoke">
-                          Memberi sorotan warna pada bidang demodulasi sinyal di tengah spektrum (6 kHz AM / 12.5 kHz NFM).
-                        </p>
-                      </div>
-                    </label>
-
-                    <label className="flex items-start gap-2.5 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={uiSettings.spectrumFreezeOnHop}
-                        onChange={(e) => updateUiSettings({ spectrumFreezeOnHop: e.target.checked })}
-                        className="mt-0.5 accent-phosphor-green"
-                      />
-                      <div>
-                        <span className="text-xs text-snow font-medium">Hanya Update Spektrum Saat Ada Percakapan (Multichannel Hopping)</span>
-                        <p className="text-[11px] text-smoke">
-                          Mencegah grafik spektrum dan skala frekuensi berkedip/melompat saat radio sedang scanning cepat tanpa percakapan aktif.
+                          Highlight signal demodulation width at spectrum center (6 kHz AM / 12.5 kHz NFM).
                         </p>
                       </div>
                     </label>
@@ -1737,14 +1722,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
               </div>
 
-              {/* Seksi 2: General Interface & Audio Preferences */}
+              {/* Section 2: General Interface & Audio Preferences */}
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <Sliders className="w-4 h-4 text-phosphor-green" />
-                  <h3 className="text-sm font-medium text-snow">General Interface & Audio</h3>
+                  <h3 className="text-sm font-medium text-snow">General Interface & Audio Preferences</h3>
                 </div>
                 <p className="text-xs text-smoke mb-4">
-                  Pengaturan format waktu, kepadatan tampilan timeline, dan preferensi audio player.
+                  Configure clock display format, timeline scrubber density, and audio playback preferences.
                 </p>
 
                 <div className="space-y-4 bg-ash/50 border border-charcoal rounded-cards p-4">
@@ -1752,7 +1737,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     {/* Time Format */}
                     <div>
                       <label className="block text-xs font-medium text-silver-mist mb-1.5">
-                        Format Waktu Jam
+                        Time Display Format
                       </label>
                       <select
                         value={uiSettings.timeFormat}
@@ -1767,15 +1752,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     {/* Timeline Density */}
                     <div>
                       <label className="block text-xs font-medium text-silver-mist mb-1.5">
-                        Tinggi Timeline Scrubber
+                        Timeline Scrubber Density
                       </label>
                       <select
                         value={uiSettings.timelineDensity}
                         onChange={(e) => updateUiSettings({ timelineDensity: e.target.value as any })}
                         className="w-full bg-obsidian border border-slate focus:border-phosphor-green rounded-inputs px-3 py-2 text-xs text-snow outline-none font-mono"
                       >
-                        <option value="standard">Standard (180px) — Luas & Detail</option>
-                        <option value="compact">Compact (130px) — Lebih Hemat Ruang Layar</option>
+                        <option value="standard">Standard (180px) — Spacious & Detailed</option>
+                        <option value="compact">Compact (130px) — Saves Screen Space</option>
                       </select>
                     </div>
                   </div>
@@ -1790,9 +1775,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         className="mt-0.5 accent-phosphor-green"
                       />
                       <div>
-                        <span className="text-xs text-snow font-medium">Tampilkan Detik pada Jam Header</span>
+                        <span className="text-xs text-snow font-medium">Show Seconds in Header Clock</span>
                         <p className="text-[11px] text-smoke">
-                          Menampilkan detik (`HH:mm:ss`) atau format ringkas tanpa detik (`HH:mm`).
+                          Display seconds (HH:mm:ss) or compact format without seconds (HH:mm).
                         </p>
                       </div>
                     </label>
@@ -1807,7 +1792,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <div>
                         <span className="text-xs text-snow font-medium">Continuous Call Playback (Auto-play Next)</span>
                         <p className="text-[11px] text-smoke">
-                          Otomatis memutar rekaman transmisi berikutnya dalam antrian log panggilan setelah rekaman saat ini selesai.
+                          Automatically play subsequent transmissions in chronological call log queue once current playback ends.
                         </p>
                       </div>
                     </label>
@@ -1818,7 +1803,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               {/* Reset to Defaults Footer */}
               <div className="flex justify-between items-center pt-2 border-t border-charcoal">
                 <span className="text-[11px] text-smoke">
-                  Semua pengaturan UI disimpan otomatis di browser (localStorage).
+                  All UI settings are automatically saved in browser (localStorage).
                 </span>
                 <button
                   type="button"

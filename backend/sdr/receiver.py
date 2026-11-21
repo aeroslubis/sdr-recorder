@@ -591,9 +591,6 @@ class SDRReceiver:
                         self._last_hw_check_time = now
                         if is_hardware_available(self.config.device_index):
                             logger.info(f"RTL-SDR dongle {self.config.device_index} reconnected. Restarting...")
-                            dongle_logger.info(
-                                f"RTL-SDR dongle reconnected on device_index={self.config.device_index}. Respawning rtl_fm process."
-                            )
                             try:
                                 if self._process:
                                     self._process.kill()
@@ -606,7 +603,7 @@ class SDRReceiver:
                                     stdout=asyncio.subprocess.PIPE,
                                     stderr=asyncio.subprocess.DEVNULL,
                                 )
-                                self._is_hardware_connected = True
+                                self._mark_hardware_connected()
                             except Exception as e:
                                 logger.warning(f"Failed to respawn rtl_fm on reconnect: {e}")
                     continue
