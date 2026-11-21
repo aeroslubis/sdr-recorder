@@ -36,6 +36,7 @@ describe('SettingsModal', () => {
     expect(screen.getByRole('tab', { name: /channel setup/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /recording setup/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /storage/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /interface/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /password/i })).toBeInTheDocument();
 
     // Check default dongle tab content
@@ -51,6 +52,11 @@ describe('SettingsModal', () => {
     expect(screen.getByText(/Minimum Speech Duration/i)).toBeInTheDocument();
     expect(screen.getByText(/Server Timezone/i)).toBeInTheDocument();
     expect(screen.getByText(/Enable Squelch Tail & Pop Suppression/i)).toBeInTheDocument();
+
+    // Switch to Interface tab
+    fireEvent.click(screen.getByRole('tab', { name: /interface/i }));
+    expect(screen.getByText(/Live SDR Spectrum Display/i)).toBeInTheDocument();
+    expect(screen.getByText(/General Interface & Audio/i)).toBeInTheDocument();
 
     // Switch to Storage tab
     fireEvent.click(screen.getByRole('tab', { name: /storage/i }));
@@ -206,5 +212,58 @@ describe('SettingsModal', () => {
       name: 'Haneda Tower',
       frequency_hz: 118200000,
     }));
+  });
+
+  test('renders Interface tab and does not render any Logs tab', () => {
+    render(
+      <SettingsModal
+        isOpen={true}
+        initialTab="interface"
+        onClose={jest.fn()}
+        onSaveDongle={jest.fn()}
+        onSaveStorage={jest.fn()}
+        onChangePassword={jest.fn()}
+        presets={[]}
+      />
+    );
+
+    // Interface tab must exist and be selected
+    const interfaceTab = screen.getByRole('tab', { name: /interface/i });
+    expect(interfaceTab).toBeInTheDocument();
+    expect(screen.getByText(/Live SDR Spectrum Display/i)).toBeInTheDocument();
+
+    // Logs tab must NOT exist
+    expect(screen.queryByRole('tab', { name: /logs/i })).toBeNull();
+    expect(screen.queryByText(/Backend System Logs/i)).toBeNull();
+  });
+
+  test('renders Interface tab fully in English and without scanner hopping options', () => {
+    render(
+      <SettingsModal
+        isOpen={true}
+        initialTab="interface"
+        onClose={jest.fn()}
+        onSaveDongle={jest.fn()}
+        onSaveStorage={jest.fn()}
+        onChangePassword={jest.fn()}
+        presets={[]}
+      />
+    );
+
+    // English labels
+    expect(screen.getByText(/Live SDR Spectrum Display/i)).toBeInTheDocument();
+    expect(screen.getByText(/Color Palette/i)).toBeInTheDocument();
+    expect(screen.getByText(/Refresh Rate \(FPS \/ CPU Efficiency\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/Show Filter Passband Overlay/i)).toBeInTheDocument();
+    expect(screen.getByText(/General Interface & Audio Preferences/i)).toBeInTheDocument();
+    expect(screen.getByText(/Time Display Format/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Timeline Scrubber Density/i)[0]).toBeInTheDocument();
+    expect(screen.getByText(/Show Seconds in Header Clock/i)).toBeInTheDocument();
+    expect(screen.getByText(/Continuous Call Playback \(Auto-play Next\)/i)).toBeInTheDocument();
+
+    // No scanner / hopping residuals
+    expect(screen.queryByText(/Multichannel Hopping/i)).toBeNull();
+    expect(screen.queryByText(/scanning cepat/i)).toBeNull();
+    expect(screen.queryByText(/Skema Warna/i)).toBeNull();
   });
 });

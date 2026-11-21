@@ -64,4 +64,53 @@ describe('LiveSpectrumVisualizer', () => {
     );
     expect(fillStyles[0]).toBe('#121212');
   });
+
+  test('applies custom color palette and updates carrier text class', () => {
+    const { rerender } = render(
+      <LiveSpectrumVisualizer
+        frequencyHz={118200000}
+        modulation="AM"
+        squelchOpen={true}
+        colorMap="cyan"
+      />
+    );
+
+    const carrierSpan = screen.getByText(/CARRIER ACTIVE/i);
+    expect(carrierSpan).toHaveClass('text-cyan-400');
+
+    rerender(
+      <LiveSpectrumVisualizer
+        frequencyHz={118200000}
+        modulation="AM"
+        squelchOpen={true}
+        colorMap="amber"
+      />
+    );
+    expect(screen.getByText(/CARRIER ACTIVE/i)).toHaveClass('text-amber-400');
+  });
+
+  test('respects showPassband prop to toggle passband overlay', () => {
+    const mockCtx = {
+      fillRect: vi.fn(),
+      strokeRect: vi.fn(),
+      beginPath: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      stroke: vi.fn(),
+      fillText: vi.fn(),
+      fillStyle: '',
+      strokeStyle: '',
+    };
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(mockCtx as any);
+
+    render(
+      <LiveSpectrumVisualizer
+        frequencyHz={118200000}
+        modulation="AM"
+        showPassband={false}
+      />
+    );
+
+    expect(mockCtx.strokeRect).not.toHaveBeenCalled();
+  });
 });

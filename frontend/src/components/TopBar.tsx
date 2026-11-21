@@ -15,7 +15,6 @@ import { useTheme, Theme } from '../context/ThemeContext';
 export interface TopBarProps {
   frequencyHz?: number;
   modulation?: string;
-  isSimulator?: boolean;
   hardwareConnected?: boolean;
   diskUsedGB?: number;
   diskTotalGB?: number;
@@ -35,7 +34,6 @@ export interface TopBarProps {
 export const TopBar: React.FC<TopBarProps> = ({
   frequencyHz: _frequencyHz = 118200000,
   modulation: _modulation = 'AM',
-  isSimulator: _isSimulator = false,
   hardwareConnected = true,
   diskUsedGB = 14.8,
   diskTotalGB = 100,
