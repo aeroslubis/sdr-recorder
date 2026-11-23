@@ -1,6 +1,6 @@
 services:
   sdr-recorder:
-    image: putrasukarno/sdr-recorder:latest
+    image: aeroslubis/sdr-recorder:latest
     container_name: sdr-recorder
     restart: unless-stopped
     ports:
