@@ -1,10 +1,10 @@
 """Comprehensive End-to-End integration test suite for SDR-Recorder NVR.
 
-Tests the entire system lifecycle under Mock SDR Simulator mode:
+Tests the entire system lifecycle:
 1. Default credentials login (admin / 12345)
-2. System stats check (simulator mode / hardware mode)
+2. System stats check (hardware mode)
 3. Radio tuning and preset creation
-4. Simulated voice burst recording & database insertion
+4. Voice transmission recording & database insertion
 5. Timeline query and audio streaming retrieval (HTTP 206)
 6. Star protection and auto-retention validation
 """
@@ -21,7 +21,7 @@ from backend.database import get_connection
 from backend.storage.retention import run_retention_purge
 
 
-def test_full_nvr_cycle_with_simulator(tmp_path):
+def test_full_nvr_cycle(tmp_path):
     # Set up test database and storage in tmp_path
     db_file = str(tmp_path / "e2e_test.db")
     storage_dir = tmp_path / "recordings"

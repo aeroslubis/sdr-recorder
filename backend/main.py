@@ -18,6 +18,7 @@ from backend.sdr.dongle_config import DongleConfig
 from backend.sdr.receiver import SDRReceiver, TransmissionEvent
 from backend.storage.audio_writer import save_transmission
 from backend.storage.retention import retention_worker
+from backend.utils.dongle_logger import setup_dongle_logger
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,9 @@ def create_app(
 ) -> FastAPI:
     """Create and configure the FastAPI SDR-Recorder NVR application."""
     resolved_db_path = db_path or config.DB_PATH
+
+    # Initialize dongle activity logger (stdout + rotating storage/logs/dongle.log)
+    setup_dongle_logger(storage_dir=config.STORAGE_DIR)
 
     # Ensure database schema is initialized
     init_db(resolved_db_path)

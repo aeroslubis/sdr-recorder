@@ -7,7 +7,6 @@ describe('TopBar', () => {
       <TopBar
         frequencyHz={118200000}
         modulation="AM"
-        isSimulator={false}
         diskUsedGB={14.8}
         diskTotalGB={100}
         username="admin"
@@ -34,7 +33,6 @@ describe('TopBar', () => {
       <TopBar
         frequencyHz={118200000}
         modulation="AM"
-        isSimulator={false}
         diskUsedGB={14.8}
         diskTotalGB={100}
         username="admin"

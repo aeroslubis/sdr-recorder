@@ -1,6 +1,7 @@
 import React from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { UiSettingsProvider } from './context/UiSettingsContext';
 import { LoginView } from './components/LoginView';
 import { DashboardLayout } from './components/DashboardLayout';
 
@@ -28,9 +29,11 @@ const MainApp: React.FC = () => {
 export const App: React.FC = () => {
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <MainApp />
-      </AuthProvider>
+      <UiSettingsProvider>
+        <AuthProvider>
+          <MainApp />
+        </AuthProvider>
+      </UiSettingsProvider>
     </ThemeProvider>
   );
 };
