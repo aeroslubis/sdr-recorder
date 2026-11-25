@@ -1,13 +1,12 @@
-# SDR-Recorder NVR
+# SDR-Recorder
 
 <p align="center">
   <img src="docs/assets/logo.jpg" alt="SDR-Recorder Logo" width="220" style="border-radius: 20px; box-shadow: 0 4px 20px rgba(62, 207, 142, 0.25);" />
 </p>
 
-<h1 align="center">SDR-Recorder NVR</h1>
+<h1 align="center">SDR-Recorder</h1>
 
 <p align="center">
-  <strong>CCTV Network Video Recorder (NVR) architecture applied to Radio Communications.</strong><br>
   Continuous 24/7 radio monitoring, intelligent squelch indexing, real-time spectrum analysis, and historical playback for Airband & VHF/UHF.
 </p>
 
@@ -91,7 +90,7 @@ The system initializes an admin account upon first boot:
 
 ## Comprehensive Installation Guide
 
-There are three supported ways to deploy and run SDR-Recorder NVR:
+There are three supported ways to deploy and run SDR-Recorder:
 1. **[Method A: Manual Installation (Bare Metal / Development)](#2-method-a-manual-installation-bare-metal--development)** — Runs directly on the Linux host without containers. Ideal for active development, debugging, or resource-constrained embedded systems.
 2. **[Method B: Using Docker Run](#3-method-b-using-docker-run)** — Single standalone container command using the official pre-built image from Docker Hub.
 3. **[Method C: Using Docker Compose](#4-method-c-using-docker-compose-recommended)** — **Recommended for production servers and VPS deployments** with declarative configuration, persistent volume mounts, and automated restarts.
@@ -200,7 +199,7 @@ Choose your preferred launch mode:
   Create `/etc/systemd/system/sdr-recorder.service`:
   ```ini
   [Unit]
-  Description=SDR-Recorder NVR Service
+  Description=SDR-Recorder Service
   After=network.target
 
   [Service]
@@ -290,7 +289,7 @@ docker stop sdr-recorder && docker rm sdr-recorder
 
 ### 4. Method C: Using Docker Compose (Recommended)
 
-Docker Compose is the recommended way to deploy SDR-Recorder on home servers, NVR rigs, or VPS instances. All volumes, environment variables, and USB device pass-through settings are declaratively defined in a single file.
+Docker Compose is the recommended way to deploy SDR-Recorder. All volumes, environment variables, and USB device pass-through settings are declaratively defined in a single file.
 
 #### Step 1: Prepare Directory & `docker-compose.yml`
 Create a directory on your server (e.g. `~/containers/sdr-recorder`):
@@ -302,7 +301,7 @@ Create `docker-compose.yml`:
 ```yaml
 services:
   sdr-recorder:
-    image: putrasukarno/sdr-recorder:latest
+    image: aeroslubis/sdr-recorder:latest
     container_name: sdr-recorder
     restart: unless-stopped
     ports:

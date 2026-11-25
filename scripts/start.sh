@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -e
 
-# SDR-Recorder NVR unified startup script
+# SDR-Recorder unified startup script
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_ROOT"
 export PYTHONPATH="${PROJECT_ROOT}:${PYTHONPATH:-}"
 
-echo "=== SDR-Recorder NVR Launcher ==="
+echo "=== SDR-Recorder Launcher ==="
 
 # 1. Check or set up Python virtual environment
 VENV_PATH="$PROJECT_ROOT/.venv"
@@ -37,7 +37,7 @@ fi
 HOST="${SDR_HOST:-0.0.0.0}"
 PORT="${SDR_PORT:-8000}"
 
-echo "[*] Starting SDR-Recorder NVR on http://${HOST}:${PORT}"
+echo "[*] Starting SDR-Recorder on http://${HOST}:${PORT}"
 echo "[*] Default credentials: admin / 12345"
 
 # 4. Start backend server using runner
