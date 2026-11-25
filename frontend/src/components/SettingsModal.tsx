@@ -20,6 +20,7 @@ import {
 import { PresetItem } from './RadioTuningPanel';
 import { DongleHardwareConfig, R820T_GAIN_STEPS } from './DongleConfigModal';
 import { useUiSettings } from '../context/UiSettingsContext';
+import { readStoredToken } from '../utils/authStorage';
 
 export type SettingsTab = 'dongle' | 'channels' | 'recording' | 'storage' | 'password' | 'interface';
 
@@ -123,14 +124,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   ]);
 
   const refreshDevices = () => {
-    let token: string | null = null;
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        token = window.localStorage.getItem('sdr_auth_token');
-      }
-    } catch {
-      // Ignored in test environments without storage
-    }
+    const token = readStoredToken();
     const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
     fetch('/api/radio/devices', { headers })
       .then((res) => (res.ok ? res.json() : null))
@@ -235,12 +229,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   } | null>(null);
 
   const fetchServerSettingsAndTime = () => {
-    let token: string | null = null;
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        token = window.localStorage.getItem('sdr_auth_token');
-      }
-    } catch {}
+    const token = readStoredToken();
     const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
 
     fetch('/api/system/time', { headers })
@@ -283,17 +272,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       if (onSaveRecording) {
         await onSaveRecording(recordingSettings);
       } else {
-        let token: string | null = null;
-        try {
-          if (typeof window !== 'undefined' && window.localStorage) {
-            token = window.localStorage.getItem('sdr_auth_token');
-          }
-        } catch {}
+        const token = readStoredToken();
         const headers: HeadersInit = {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         };
-        await fetch('/api/system/settings', {
+        const res = await fetch('/api/system/settings', {
           method: 'POST',
           headers,
           body: JSON.stringify({
@@ -301,10 +285,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             enable_squelch_tail_suppression: recordingSettings.enable_squelch_tail_suppression ? 1 : 0,
           }),
         });
+        if (!res.ok) {
+          throw new Error(`Failed to save recording settings (${res.status})`);
+        }
       }
       setRecordingSaved(true);
       setTimeout(() => setRecordingSaved(false), 2500);
       fetchServerSettingsAndTime();
+    } catch {
+      setRecordingSaved(false);
     } finally {
       setRecordingSaving(false);
     }

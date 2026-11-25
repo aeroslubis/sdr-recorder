@@ -33,7 +33,36 @@ describe('LoginView Component', () => {
       fireEvent.click(submitButton);
     });
 
-    expect(handleLogin).toHaveBeenCalledWith('admin', '12345');
+    expect(handleLogin).toHaveBeenCalledWith('admin', '12345', false);
+  });
+
+  test('exposes browser password-manager form attributes and unchecked Remember me by default', () => {
+    const { container } = render(<LoginView onLogin={jest.fn()} />);
+    const form = container.querySelector('form') as HTMLFormElement;
+    expect(form.getAttribute('method')).toBe('post');
+
+    const usernameInput = screen.getByLabelText(/username/i) as HTMLInputElement;
+    const passwordInput = screen.getByLabelText(/password/i) as HTMLInputElement;
+    expect(usernameInput.getAttribute('name')).toBe('username');
+    expect(passwordInput.getAttribute('name')).toBe('password');
+
+    const rememberCheckbox = screen.getByLabelText(/remember me/i) as HTMLInputElement;
+    expect(rememberCheckbox.type).toBe('checkbox');
+    expect(rememberCheckbox.checked).toBe(false);
+  });
+
+  test('passes rememberMe=true when Remember me checkbox is checked', async () => {
+    const handleLogin = jest.fn();
+    render(<LoginView onLogin={handleLogin} />);
+
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText(/username/i), { target: { value: 'admin' } });
+      fireEvent.change(screen.getByLabelText(/password/i), { target: { value: '12345' } });
+      fireEvent.click(screen.getByLabelText(/remember me/i));
+      fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
+    });
+
+    expect(handleLogin).toHaveBeenCalledWith('admin', '12345', true);
   });
 
   test('displays error message when error is provided', () => {

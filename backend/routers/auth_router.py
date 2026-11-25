@@ -1,10 +1,12 @@
 """Authentication API endpoints for SDR-Recorder NVR."""
+from datetime import timedelta
 import sqlite3
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials
 
+from backend import config
 from backend.auth import (
     create_access_token,
     get_current_user,
@@ -37,7 +39,15 @@ def login(payload: UserLogin, db: sqlite3.Connection = Depends(get_db)) -> Dict[
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    token = create_access_token({"sub": user["username"], "user_id": user["id"]})
+    expires_delta = (
+        timedelta(days=config.JWT_REMEMBER_EXPIRATION_DAYS)
+        if payload.remember_me
+        else None
+    )
+    token = create_access_token(
+        {"sub": user["username"], "user_id": user["id"]},
+        expires_delta=expires_delta,
+    )
     return {
         "token": token,
         "token_type": "bearer",

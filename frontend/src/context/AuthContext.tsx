@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { clearStoredTokens, readStoredToken, saveStoredToken } from '../utils/authStorage';
 
 export interface User {
   id: number;
@@ -11,24 +12,22 @@ export interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
-  login: (username: string, password: string) => Promise<boolean>;
+  login: (username: string, password: string, rememberMe?: boolean) => Promise<boolean>;
   logout: () => Promise<void>;
   clearError: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const TOKEN_KEY = 'sdr_auth_token';
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_KEY));
+  const [token, setToken] = useState<string | null>(() => readStoredToken());
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const verifySession = async () => {
-      const storedToken = localStorage.getItem(TOKEN_KEY);
+      const storedToken = readStoredToken();
       if (!storedToken) {
         setIsLoading(false);
         return;
@@ -46,7 +45,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser(userData);
           setToken(storedToken);
         } else {
-          localStorage.removeItem(TOKEN_KEY);
+          clearStoredTokens();
           setToken(null);
           setUser(null);
         }
@@ -62,7 +61,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     verifySession();
   }, []);
 
-  const login = async (username: string, password: string): Promise<boolean> => {
+  const login = async (
+    username: string,
+    password: string,
+    rememberMe: boolean = false
+  ): Promise<boolean> => {
     setError(null);
     try {
       const response = await fetch('/api/auth/login', {
@@ -70,7 +73,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username, password, remember_me: rememberMe }),
       });
 
       if (!response.ok) {
@@ -88,7 +91,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       const data = await response.json();
-      localStorage.setItem(TOKEN_KEY, data.token);
+      saveStoredToken(data.token, rememberMe);
       setToken(data.token);
       setUser(data.user);
       return true;
@@ -112,7 +115,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.error('Logout error:', err);
       }
     }
-    localStorage.removeItem(TOKEN_KEY);
+    clearStoredTokens();
     setToken(null);
     setUser(null);
     setError(null);

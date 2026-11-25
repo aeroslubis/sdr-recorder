@@ -12,6 +12,7 @@ import { WebAudioPlayer } from '../audio/WebAudioPlayer';
 import { formatDate } from './HistoryDatePicker';
 import { NoDeviceModal } from './NoDeviceModal';
 import { useUiSettings } from '../context/UiSettingsContext';
+import { readStoredToken } from '../utils/authStorage';
 
 export interface DashboardLayoutProps {
   className?: string;
@@ -549,7 +550,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
     if (uiSettings.continuousPlayback) {
       isContinuousPlayRef.current = true;
     }
-    const authToken = token || localStorage.getItem('sdr_auth_token') || sessionStorage.getItem('sdr_auth_token') || '';
+    const authToken = token || readStoredToken() || '';
     const audioUrl = `/api/recordings/${id}/audio${authToken ? `?token=${encodeURIComponent(authToken)}` : ''}`;
     if (audioPlayerRef.current) {
       try {
@@ -578,7 +579,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
     } else {
       isContinuousPlayRef.current = true;
       if (selectedCallId) {
-        const authToken = token || localStorage.getItem('sdr_auth_token') || sessionStorage.getItem('sdr_auth_token') || '';
+        const authToken = token || readStoredToken() || '';
         const audioUrl = `/api/recordings/${selectedCallId}/audio${authToken ? `?token=${encodeURIComponent(authToken)}` : ''}`;
         try {
           await audioPlayerRef.current.playUrl(audioUrl);
@@ -614,7 +615,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
   const handleExportClip = async (id?: number) => {
     const targetId = id || selectedCallId;
     if (!targetId) return;
-    const authToken = token || localStorage.getItem('sdr_auth_token') || sessionStorage.getItem('sdr_auth_token') || '';
+    const authToken = token || readStoredToken() || '';
 
     // Find call record to build a clean filename with frequency, time, and true extension
     const call = calls.find((c) => c.id === targetId);

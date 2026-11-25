@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Radio, LogIn, AlertCircle, Lock, User as UserIcon } from 'lucide-react';
 
 export interface LoginViewProps {
-  onLogin?: (username: string, password: string) => void | Promise<void | boolean>;
+  onLogin?: (username: string, password: string, rememberMe?: boolean) => void | Promise<void | boolean>;
   error?: string | null;
   isLoading?: boolean;
 }
@@ -14,6 +14,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
 }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [internalError, setInternalError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -31,7 +32,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
     if (onLogin) {
       setSubmitting(true);
       try {
-        await onLogin(username, password);
+        await onLogin(username, password, rememberMe);
       } catch (err: any) {
         setInternalError(err?.message || 'Login failed');
       } finally {
@@ -75,7 +76,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form method="post" onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label
               htmlFor="username"
@@ -89,6 +90,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
               </div>
               <input
                 id="username"
+                name="username"
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
@@ -113,6 +115,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
               </div>
               <input
                 id="password"
+                name="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -122,6 +125,22 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 className="w-full pl-9 pr-3 py-2 bg-obsidian border border-slate rounded-inputs text-sm text-snow placeholder-smoke focus:border-phosphor-green focus:outline-none transition-colors"
               />
             </div>
+          </div>
+
+          <div className="flex items-center">
+            <label
+              htmlFor="remember-me"
+              className="inline-flex items-center gap-2 text-xs text-silver-mist cursor-pointer select-none"
+            >
+              <input
+                id="remember-me"
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-3.5 h-3.5 rounded border border-slate bg-obsidian accent-phosphor-green cursor-pointer"
+              />
+              <span>Remember me</span>
+            </label>
           </div>
 
           <button

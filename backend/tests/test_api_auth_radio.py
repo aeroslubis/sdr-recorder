@@ -252,3 +252,42 @@ def test_radio_restart_device(client):
         assert data["success"] is True
         assert "hardware_connected" in data
         assert "is_running" in data
+
+
+def test_login_remember_me_token_expiration(client):
+    from datetime import datetime, timezone
+    import jwt
+    from backend import config
+
+    # Default login (omitting remember_me) -> ~24h expiration
+    resp_default = client.post("/api/auth/login", json={"username": "admin", "password": "12345"})
+    assert resp_default.status_code == 200
+    payload_default = jwt.decode(
+        resp_default.json()["token"],
+        config.JWT_SECRET,
+        algorithms=[config.JWT_ALGORITHM],
+    )
+    now_ts = datetime.now(timezone.utc).timestamp()
+    default_ttl = payload_default["exp"] - now_ts
+    assert 23 * 3600 < default_ttl <= 25 * 3600
+
+    # Explicit remember_me=True -> ~30d expiration
+    resp_remember = client.post(
+        "/api/auth/login",
+        json={"username": "admin", "password": "12345", "remember_me": True},
+    )
+    assert resp_remember.status_code == 200
+    payload_remember = jwt.decode(
+        resp_remember.json()["token"],
+        config.JWT_SECRET,
+        algorithms=[config.JWT_ALGORITHM],
+    )
+    remember_ttl = payload_remember["exp"] - now_ts
+    assert 29 * 86400 < remember_ttl <= 31 * 86400
+
+    # Invalid password with remember_me=True still fails with 401
+    resp_bad = client.post(
+        "/api/auth/login",
+        json={"username": "admin", "password": "wrong", "remember_me": True},
+    )
+    assert resp_bad.status_code == 401

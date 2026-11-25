@@ -31,6 +31,7 @@ class UserCreate(UserBase):
 class UserLogin(BaseModel):
     username: str
     password: str
+    remember_me: bool = False
 
 
 class UserResponse(UserBase):

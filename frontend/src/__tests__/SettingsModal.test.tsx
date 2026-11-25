@@ -266,4 +266,55 @@ describe('SettingsModal', () => {
     expect(screen.queryByText(/scanning cepat/i)).toBeNull();
     expect(screen.queryByText(/Skema Warna/i)).toBeNull();
   });
+
+  test('uses sessionStorage token for settings requests and does not show saved message on HTTP error', async () => {
+    localStorage.clear();
+    sessionStorage.setItem('sdr_auth_token', 'session-only-jwt');
+
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url === '/api/system/settings' && init?.method === 'POST') {
+        return new Response(JSON.stringify({ detail: 'Unauthorized' }), { status: 401 });
+      }
+      if (url === '/api/radio/devices') {
+        return new Response(JSON.stringify([]), { status: 200 });
+      }
+      return new Response(JSON.stringify({}), { status: 200 });
+    });
+
+    render(
+      <SettingsModal
+        isOpen={true}
+        initialTab="recording"
+        onClose={jest.fn()}
+        onSaveDongle={jest.fn()}
+        onSaveStorage={jest.fn()}
+        onChangePassword={jest.fn()}
+        presets={[]}
+      />
+    );
+
+    const authHeaders = fetchMock.mock.calls.map(([, init]) => {
+      const headers = init?.headers as Record<string, string> | undefined;
+      return headers?.Authorization;
+    });
+    expect(authHeaders.length).toBeGreaterThanOrEqual(3);
+    authHeaders.forEach((auth) => expect(auth).toBe('Bearer session-only-jwt'));
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /save recording setup/i }));
+    });
+
+    const postCall = fetchMock.mock.calls.find(
+      ([url, init]) => String(url) === '/api/system/settings' && init?.method === 'POST'
+    );
+    expect(postCall).toBeDefined();
+    expect((postCall?.[1]?.headers as Record<string, string>)?.Authorization).toBe(
+      'Bearer session-only-jwt'
+    );
+    expect(screen.queryByText(/Recording settings saved and applied to receiver/i)).toBeNull();
+
+    vi.restoreAllMocks();
+    sessionStorage.clear();
+  });
 });

@@ -12,6 +12,7 @@ DB_PATH = os.environ.get("SDR_DB_PATH", str(STORAGE_DIR / "sdr_recorder.db"))
 JWT_SECRET = os.environ.get("JWT_SECRET", "sdr-recorder-nvr-default-secret-key-change-in-production")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = int(os.environ.get("JWT_EXPIRATION_HOURS", "24"))
+JWT_REMEMBER_EXPIRATION_DAYS = int(os.environ.get("JWT_REMEMBER_EXPIRATION_DAYS", "30"))
 
 DEFAULT_ADMIN_USERNAME = os.environ.get("DEFAULT_ADMIN_USERNAME", "admin")
 DEFAULT_ADMIN_PASSWORD = os.environ.get("DEFAULT_ADMIN_PASSWORD", "12345")

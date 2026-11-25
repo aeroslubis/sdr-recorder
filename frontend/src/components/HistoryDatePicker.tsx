@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { readStoredToken } from '../utils/authStorage';
 
 export interface HistoryDatePickerProps {
   selectedDate: string; // YYYY-MM-DD
@@ -58,10 +59,7 @@ export const HistoryDatePicker: React.FC<HistoryDatePickerProps> = ({
     let isMounted = true;
     const monthStr = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}`;
 
-    const token =
-      (typeof window !== 'undefined' && window.localStorage?.getItem?.('sdr_auth_token')) ||
-      (typeof window !== 'undefined' && window.sessionStorage?.getItem?.('sdr_auth_token')) ||
-      '';
+    const token = readStoredToken() || '';
     const headers: Record<string, string> = {};
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
