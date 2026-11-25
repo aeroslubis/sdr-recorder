@@ -196,10 +196,12 @@ async def test_receiver_restart_with_usb_reset():
     receiver = SDRReceiver()
     with patch("backend.sdr.receiver.is_hardware_available", return_value=True), \
          patch("backend.sdr.receiver.reset_rtl_sdr_usb_dongle", return_value=True) as mock_reset, \
+         patch("asyncio.create_subprocess_exec", new_callable=AsyncMock), \
          patch("asyncio.sleep", new_callable=AsyncMock):
         success = await receiver.restart(reset_usb=True)
         assert success is True
         mock_reset.assert_called_once_with(receiver.config.device_index)
+        await receiver.stop()
 
 
 

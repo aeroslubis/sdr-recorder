@@ -19,6 +19,7 @@ from backend.sdr.receiver import SDRReceiver, TransmissionEvent
 from backend.storage.audio_writer import save_transmission
 from backend.storage.retention import retention_worker
 from backend.utils.dongle_logger import setup_dongle_logger
+from backend.utils.preflight import log_preflight_report, run_preflight_checks
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +55,14 @@ def create_app(
     async def lifespan(app: FastAPI):
         nonlocal retention_task
         logger.info("Starting SDR-Recorder NVR backend engine...")
+
+        # Run startup requirements check (rtl-sdr, dvb_usb_rtl28xxu blacklist, ffmpeg, python deps, storage)
+        if not app.state.test_mode:
+            report = run_preflight_checks(storage_dir=config.STORAGE_DIR)
+            app.state.preflight = report
+            log_preflight_report(report, target_logger=logger)
+            if not report["ok"] and config.STRICT_REQUIREMENTS:
+                raise RuntimeError("Startup requirements check failed; see preflight logs.")
 
         # Start background retention worker in non-test mode
         if not app.state.test_mode:
@@ -93,6 +102,7 @@ def create_app(
     # Attach state
     app.state.db_path = resolved_db_path
     app.state.test_mode = test_mode
+    app.state.preflight = None
     app.state.receiver = SDRReceiver(
         config=dongle_cfg,
     )
@@ -147,11 +157,16 @@ def create_app(
 
     @app.get("/api/health")
     def health_check() -> Dict[str, Any]:
-        return {
+        preflight = getattr(app.state, "preflight", None)
+        payload: Dict[str, Any] = {
             "status": "ok",
             "hardware_connected": app.state.receiver.is_hardware_connected,
             "is_running": app.state.receiver.is_running,
+            "requirements_ok": preflight["ok"] if isinstance(preflight, dict) else True,
         }
+        if preflight is not None:
+            payload["preflight"] = preflight
+        return payload
 
     return app
 

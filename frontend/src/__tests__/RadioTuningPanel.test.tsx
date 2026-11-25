@@ -86,6 +86,52 @@ describe('RadioTuningPanel & SMeterBar & DongleConfigModal & TopBar', () => {
     expect(screen.queryByText(/CLOSED/i)).not.toBeInTheDocument();
   });
 
+  test('SMeterBar previews squelch while dragging, tunes only on pointer release, and uses ew-resize cursor', () => {
+    const handleSquelchChange = jest.fn();
+    render(
+      <SMeterBar
+        rssi={-75.0}
+        squelchThreshold={-65.0}
+        squelchOpen={false}
+        onSquelchChange={handleSquelchChange}
+      />
+    );
+
+    const slider = screen.getByRole('slider', { name: /Squelch threshold/i });
+    expect(slider.className).toContain('cursor-ew-resize');
+    expect(slider.className).not.toContain('cursor-crosshair');
+
+    vi.spyOn(slider, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      width: 100,
+      top: 0,
+      right: 100,
+      bottom: 24,
+      height: 24,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+
+    // Pointer down & multiple moves should preview locally without calling onSquelchChange
+    fireEvent.pointerDown(slider, { clientX: 35, pointerId: 1 });
+    expect(screen.getByText(/-65\.0 dBFS/i)).toBeInTheDocument();
+    expect(handleSquelchChange).not.toHaveBeenCalled();
+
+    fireEvent.pointerMove(window, { clientX: 40, pointerId: 1 });
+    expect(screen.getByText(/-60\.0 dBFS/i)).toBeInTheDocument();
+    expect(handleSquelchChange).not.toHaveBeenCalled();
+
+    fireEvent.pointerMove(window, { clientX: 45, pointerId: 1 });
+    expect(screen.getByText(/-55\.0 dBFS/i)).toBeInTheDocument();
+    expect(handleSquelchChange).not.toHaveBeenCalled();
+
+    // Releasing pointer commits exactly once with final value
+    fireEvent.pointerUp(window, { clientX: 45, pointerId: 1 });
+    expect(handleSquelchChange).toHaveBeenCalledTimes(1);
+    expect(handleSquelchChange).toHaveBeenCalledWith(-55.0);
+  });
+
   test('DongleConfigModal renders BrowSDR settings and handles save/restart', async () => {
     const handleSave = jest.fn();
     const handleRestart = jest.fn();

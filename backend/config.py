@@ -4,9 +4,30 @@ from pathlib import Path
 
 # Paths
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(BASE_DIR / ".env", override=False)
+except ImportError:
+    pass
+
+
+def parse_bool_env(name: str, default: bool = False) -> bool:
+    """Parse a boolean environment variable safely."""
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in ("1", "true", "yes", "on")
+
+
 STORAGE_DIR = Path(os.environ.get("SDR_STORAGE_DIR", str(BASE_DIR / "storage")))
 RECORDINGS_DIR = STORAGE_DIR / "recordings"
 DB_PATH = os.environ.get("SDR_DB_PATH", str(STORAGE_DIR / "sdr_recorder.db"))
+
+# Logging & Startup Checks
+HTTP_ACCESS_LOG = parse_bool_env("HTTP_ACCESS_LOG", default=False)
+STRICT_REQUIREMENTS = parse_bool_env("STRICT_REQUIREMENTS", default=False)
 
 # Authentication & JWT
 JWT_SECRET = os.environ.get("JWT_SECRET", "sdr-recorder-nvr-default-secret-key-change-in-production")

@@ -317,4 +317,72 @@ describe('SettingsModal', () => {
     vi.restoreAllMocks();
     sessionStorage.clear();
   });
+
+  test('renders dongle sample rate option and frequency calibration slider without step buttons', async () => {
+    const handleSaveDongle = jest.fn();
+    render(
+      <SettingsModal
+        isOpen={true}
+        initialTab="dongle"
+        onClose={jest.fn()}
+        onSaveDongle={handleSaveDongle}
+        onSaveStorage={jest.fn()}
+        onChangePassword={jest.fn()}
+        presets={[]}
+        initialDongleConfig={mockDongleConfig}
+      />
+    );
+
+    const ppmSlider = screen.getByLabelText(/Frequency Calibration/i) as HTMLInputElement;
+    expect(ppmSlider.type).toBe('range');
+    expect(screen.queryByRole('button', { name: '-5' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '-1' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '+1' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '+5' })).toBeNull();
+
+    const sampleRateSelect = screen.getByLabelText(/Sample Rate/i) as HTMLSelectElement;
+    expect(sampleRateSelect.value).toBe('2048000');
+    fireEvent.change(sampleRateSelect, { target: { value: '2400000' } });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Apply & Reconfigure Dongle/i }));
+    });
+
+    expect(handleSaveDongle).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sample_rate: 2400000,
+      })
+    );
+  });
+
+  test('renders left vertical tablist and fixed dialog dimensions across all tabs', () => {
+    render(
+      <SettingsModal
+        isOpen={true}
+        initialTab="dongle"
+        onClose={jest.fn()}
+        onSaveDongle={jest.fn()}
+        onSaveStorage={jest.fn()}
+        onChangePassword={jest.fn()}
+        presets={[]}
+        initialDongleConfig={mockDongleConfig}
+      />
+    );
+
+    const tablist = screen.getByRole('tablist');
+    expect(tablist).toHaveAttribute('aria-orientation', 'vertical');
+    expect(tablist.className).toContain('flex-col');
+    expect(tablist.className).toContain('border-r');
+
+    const panel = screen.getByTestId('settings-modal-panel');
+    const initialClasses = panel.className;
+    expect(initialClasses).toMatch(/\bw-\[/);
+    expect(initialClasses).toMatch(/\bh-\[/);
+
+    const tabNames = [/channel setup/i, /recording setup/i, /storage/i, /interface/i, /password/i, /dongle/i];
+    tabNames.forEach((name) => {
+      fireEvent.click(screen.getByRole('tab', { name }));
+      expect(panel.className).toBe(initialClasses);
+    });
+  });
 });

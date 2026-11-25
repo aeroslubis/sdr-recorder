@@ -113,7 +113,19 @@ if (typeof (globalThis as any).AudioContext === 'undefined') {
   (globalThis as any).webkitAudioContext = MockAudioContext;
 }
 
-// Pointer capture mocks for jsdom
+// PointerEvent & pointer capture mocks for jsdom
+if (typeof (globalThis as any).PointerEvent === 'undefined') {
+  class MockPointerEvent extends MouseEvent {
+    public pointerId: number;
+    public pointerType: string;
+    constructor(type: string, params: PointerEventInit = {}) {
+      super(type, params);
+      this.pointerId = params.pointerId ?? 0;
+      this.pointerType = params.pointerType ?? 'mouse';
+    }
+  }
+  (globalThis as any).PointerEvent = MockPointerEvent;
+}
 if (typeof Element.prototype.setPointerCapture === 'undefined') {
   Element.prototype.setPointerCapture = vi.fn();
 }

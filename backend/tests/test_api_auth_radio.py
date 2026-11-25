@@ -291,3 +291,25 @@ def test_login_remember_me_token_expiration(client):
         json={"username": "admin", "password": "wrong", "remember_me": True},
     )
     assert resp_bad.status_code == 401
+
+
+def test_http_access_log_env_toggle(monkeypatch):
+    import importlib
+    from backend import config
+    from backend import run as run_mod
+
+    monkeypatch.delenv("HTTP_ACCESS_LOG", raising=False)
+    importlib.reload(config)
+    assert config.HTTP_ACCESS_LOG is False
+    kwargs_default = run_mod.build_uvicorn_kwargs(host="127.0.0.1", port=8000, reload=False)
+    assert kwargs_default["access_log"] is False
+
+    monkeypatch.setenv("HTTP_ACCESS_LOG", "true")
+    importlib.reload(config)
+    assert config.HTTP_ACCESS_LOG is True
+    kwargs_enabled = run_mod.build_uvicorn_kwargs(host="127.0.0.1", port=8000, reload=True)
+    assert kwargs_enabled["access_log"] is True
+
+    # Restore clean default
+    monkeypatch.delenv("HTTP_ACCESS_LOG", raising=False)
+    importlib.reload(config)

@@ -7,6 +7,8 @@ services:
       - "${SDR_PORT:-8000}:8000"
     environment:
       - TZ=${TZ:-Asia/Jayapura}
+      - HTTP_ACCESS_LOG=${HTTP_ACCESS_LOG:-false}
+      - STRICT_REQUIREMENTS=${STRICT_REQUIREMENTS:-false}
       - JWT_SECRET=${JWT_SECRET:-sdr-recorder-secret-key-change-in-production}
       - DEFAULT_ADMIN_USERNAME=${DEFAULT_ADMIN_USERNAME:-admin}
       - DEFAULT_ADMIN_PASSWORD=${DEFAULT_ADMIN_PASSWORD:-12345}

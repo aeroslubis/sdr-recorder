@@ -34,6 +34,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
   const [squelchThreshold, setSquelchThreshold] = useState<number>(-42.0);
   const [rfGain, setRfGain] = useState<number>(38.6);
   const [ppmOffset, setPpmOffset] = useState<number>(0);
+  const [sampleRate, setSampleRate] = useState<number>(2048000);
+  const [dongleExtraConfig, setDongleExtraConfig] = useState<Partial<DongleHardwareConfig>>({});
   const [hardwareConnected, setHardwareConnected] = useState<boolean>(true);
   const [dismissedNoDeviceModal, setDismissedNoDeviceModal] = useState<boolean>(false);
 
@@ -228,6 +230,15 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
           }
           if (data.rf_gain !== undefined) setRfGain(data.rf_gain);
           if (data.ppm_offset !== undefined) setPpmOffset(data.ppm_offset);
+          if (data.sample_rate !== undefined) setSampleRate(data.sample_rate);
+          setDongleExtraConfig({
+            device_index: data.device_index,
+            gain_mode: data.gain_mode,
+            bias_tee: data.bias_tee,
+            direct_sampling: data.direct_sampling,
+            pre_roll_ms: data.pre_roll_ms,
+            hang_time_ms: data.hang_time_ms,
+          });
           if (data.hardware_connected !== undefined) setHardwareConnected(data.hardware_connected);
         }
       })
@@ -702,6 +713,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
       });
       if (newConfig.rf_gain !== undefined) setRfGain(newConfig.rf_gain);
       if (newConfig.ppm_offset !== undefined) setPpmOffset(newConfig.ppm_offset);
+      if (newConfig.sample_rate !== undefined) setSampleRate(newConfig.sample_rate);
+      setDongleExtraConfig((prev) => ({ ...prev, ...newConfig }));
     } catch {}
   };
 
@@ -921,8 +934,10 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ className = ''
         onSavePreset={handleCreatePreset}
         onDeletePreset={handleDeletePreset}
         initialDongleConfig={{
+          ...dongleExtraConfig,
           rf_gain: rfGain,
           ppm_offset: ppmOffset,
+          sample_rate: sampleRate,
         }}
         initialStorageSettings={storageSettings}
         diskUsedGB={diskUsedGB}

@@ -110,9 +110,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
 
-  // Sync tab if initialTab changes when opening
+  // Sync tab and dongle config when modal opens
   useEffect(() => {
     setActiveTab(initialTab);
+    if (isOpen && initialDongleConfig) {
+      setDongleConfig((prev) => ({ ...prev, ...initialDongleConfig }));
+    }
   }, [initialTab, isOpen]);
 
   // UI Settings Context hook
@@ -320,13 +323,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   if (!isOpen) return null;
 
   // Handlers
-  const handlePpmStep = (delta: number) => {
-    setDongleConfig((prev) => {
-      const cur = prev.ppm_offset ?? 0;
-      return { ...prev, ppm_offset: Math.max(-100, Math.min(100, cur + delta)) };
-    });
-  };
-
   const handleSaveDongleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setDongleSaving(true);
@@ -464,14 +460,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-obsidian/80 backdrop-blur-sm p-4 overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-obsidian/80 backdrop-blur-sm p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="settings-dialog-title"
     >
-      <div className={`w-full max-w-2xl bg-obsidian border border-charcoal rounded-cards overflow-hidden shadow-2xl flex flex-col my-8 ${className}`}>
+      <div
+        data-testid="settings-modal-panel"
+        className={`w-[780px] max-w-[95vw] h-[580px] max-h-[90vh] bg-obsidian border border-charcoal rounded-cards overflow-hidden shadow-2xl flex flex-col ${className}`}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-charcoal bg-ash/50">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-charcoal bg-ash/50 shrink-0">
           <div className="flex items-center gap-2.5">
             <Sliders className="w-5 h-5 text-phosphor-green" />
             <h2 id="settings-dialog-title" className="text-base font-medium text-snow">
@@ -488,95 +487,100 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </button>
         </div>
 
-        {/* 4 Tabs Bar */}
-        <div className="flex items-center border-b border-charcoal bg-ash/30 px-6 overflow-x-auto" role="tablist">
-          <button
-            role="tab"
-            aria-selected={activeTab === 'dongle'}
-            onClick={() => setActiveTab('dongle')}
-            className={`flex items-center gap-2 py-3 px-4 border-b-2 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${
-              activeTab === 'dongle'
-                ? 'border-phosphor-green text-phosphor-green'
-                : 'border-transparent text-silver-mist hover:text-snow'
-            }`}
+        {/* Main Body: Left Vertical Tabs + Fixed-Frame Right Content */}
+        <div className="flex flex-1 min-h-0 overflow-hidden">
+          <div
+            className="w-48 shrink-0 border-r border-charcoal bg-ash/30 p-3 flex flex-col gap-1 overflow-y-auto"
+            role="tablist"
+            aria-orientation="vertical"
           >
-            <Sliders className="w-3.5 h-3.5" />
-            <span>Dongle</span>
-          </button>
+            <button
+              role="tab"
+              aria-selected={activeTab === 'dongle'}
+              onClick={() => setActiveTab('dongle')}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-inputs text-xs font-medium text-left transition-colors cursor-pointer ${
+                activeTab === 'dongle'
+                  ? 'bg-phosphor-green/10 text-phosphor-green border border-phosphor-green/30'
+                  : 'border border-transparent text-silver-mist hover:text-snow hover:bg-ash/60'
+              }`}
+            >
+              <Sliders className="w-3.5 h-3.5 shrink-0" />
+              <span>Dongle</span>
+            </button>
 
-          <button
-            role="tab"
-            aria-selected={activeTab === 'channels'}
-            onClick={() => setActiveTab('channels')}
-            className={`flex items-center gap-2 py-3 px-4 border-b-2 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${
-              activeTab === 'channels'
-                ? 'border-phosphor-green text-phosphor-green'
-                : 'border-transparent text-silver-mist hover:text-snow'
-            }`}
-          >
-            <Radio className="w-3.5 h-3.5" />
-            <span>Channel Setup</span>
-          </button>
+            <button
+              role="tab"
+              aria-selected={activeTab === 'channels'}
+              onClick={() => setActiveTab('channels')}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-inputs text-xs font-medium text-left transition-colors cursor-pointer ${
+                activeTab === 'channels'
+                  ? 'bg-phosphor-green/10 text-phosphor-green border border-phosphor-green/30'
+                  : 'border border-transparent text-silver-mist hover:text-snow hover:bg-ash/60'
+              }`}
+            >
+              <Radio className="w-3.5 h-3.5 shrink-0" />
+              <span>Channel Setup</span>
+            </button>
 
-          <button
-            role="tab"
-            aria-selected={activeTab === 'recording'}
-            onClick={() => setActiveTab('recording')}
-            className={`flex items-center gap-2 py-3 px-4 border-b-2 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${
-              activeTab === 'recording'
-                ? 'border-phosphor-green text-phosphor-green'
-                : 'border-transparent text-silver-mist hover:text-snow'
-            }`}
-          >
-            <Mic className="w-3.5 h-3.5" />
-            <span>Recording Setup</span>
-          </button>
+            <button
+              role="tab"
+              aria-selected={activeTab === 'recording'}
+              onClick={() => setActiveTab('recording')}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-inputs text-xs font-medium text-left transition-colors cursor-pointer ${
+                activeTab === 'recording'
+                  ? 'bg-phosphor-green/10 text-phosphor-green border border-phosphor-green/30'
+                  : 'border border-transparent text-silver-mist hover:text-snow hover:bg-ash/60'
+              }`}
+            >
+              <Mic className="w-3.5 h-3.5 shrink-0" />
+              <span>Recording Setup</span>
+            </button>
 
-          <button
-            role="tab"
-            aria-selected={activeTab === 'storage'}
-            onClick={() => setActiveTab('storage')}
-            className={`flex items-center gap-2 py-3 px-4 border-b-2 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${
-              activeTab === 'storage'
-                ? 'border-phosphor-green text-phosphor-green'
-                : 'border-transparent text-silver-mist hover:text-snow'
-            }`}
-          >
-            <HardDrive className="w-3.5 h-3.5" />
-            <span>Storage</span>
-          </button>
+            <button
+              role="tab"
+              aria-selected={activeTab === 'storage'}
+              onClick={() => setActiveTab('storage')}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-inputs text-xs font-medium text-left transition-colors cursor-pointer ${
+                activeTab === 'storage'
+                  ? 'bg-phosphor-green/10 text-phosphor-green border border-phosphor-green/30'
+                  : 'border border-transparent text-silver-mist hover:text-snow hover:bg-ash/60'
+              }`}
+            >
+              <HardDrive className="w-3.5 h-3.5 shrink-0" />
+              <span>Storage</span>
+            </button>
 
-          <button
-            role="tab"
-            aria-selected={activeTab === 'interface'}
-            onClick={() => setActiveTab('interface')}
-            className={`flex items-center gap-2 py-3 px-4 border-b-2 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${
-              activeTab === 'interface'
-                ? 'border-phosphor-green text-phosphor-green'
-                : 'border-transparent text-silver-mist hover:text-snow'
-            }`}
-          >
-            <Monitor className="w-3.5 h-3.5" />
-            <span>Interface</span>
-          </button>
+            <button
+              role="tab"
+              aria-selected={activeTab === 'interface'}
+              onClick={() => setActiveTab('interface')}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-inputs text-xs font-medium text-left transition-colors cursor-pointer ${
+                activeTab === 'interface'
+                  ? 'bg-phosphor-green/10 text-phosphor-green border border-phosphor-green/30'
+                  : 'border border-transparent text-silver-mist hover:text-snow hover:bg-ash/60'
+              }`}
+            >
+              <Monitor className="w-3.5 h-3.5 shrink-0" />
+              <span>Interface</span>
+            </button>
 
-          <button
-            role="tab"
-            aria-selected={activeTab === 'password'}
-            onClick={() => setActiveTab('password')}
-            className={`flex items-center gap-2 py-3 px-4 border-b-2 text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${
-              activeTab === 'password'
-                ? 'border-phosphor-green text-phosphor-green'
-                : 'border-transparent text-silver-mist hover:text-snow'
-            }`}
-          >
-            <KeyRound className="w-3.5 h-3.5" />
-            <span>Password</span>
-          </button>
-        </div>
+            <button
+              role="tab"
+              aria-selected={activeTab === 'password'}
+              onClick={() => setActiveTab('password')}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-inputs text-xs font-medium text-left transition-colors cursor-pointer ${
+                activeTab === 'password'
+                  ? 'bg-phosphor-green/10 text-phosphor-green border border-phosphor-green/30'
+                  : 'border border-transparent text-silver-mist hover:text-snow hover:bg-ash/60'
+              }`}
+            >
+              <KeyRound className="w-3.5 h-3.5 shrink-0" />
+              <span>Password</span>
+            </button>
+          </div>
 
-        {/* Tab Contents */}
-        <div className="p-6 overflow-y-auto max-h-[70vh]">
+          {/* Tab Contents */}
+          <div className="flex-1 min-w-0 p-6 overflow-y-auto">
           {/* TAB 1: DONGLE */}
           {activeTab === 'dongle' && (
             <form onSubmit={handleSaveDongleSubmit} className="space-y-5">
@@ -622,50 +626,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     {(dongleConfig.ppm_offset ?? 0) > 0 ? `+${dongleConfig.ppm_offset}` : dongleConfig.ppm_offset} PPM
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    id="ppm-input"
-                    type="range"
-                    min="-100"
-                    max="100"
-                    step="1"
-                    value={dongleConfig.ppm_offset ?? 0}
-                    onChange={(e) =>
-                      setDongleConfig({ ...dongleConfig, ppm_offset: parseInt(e.target.value, 10) })
-                    }
-                    className="flex-1 accent-phosphor-green cursor-pointer"
-                  />
-                  <div className="flex items-center gap-1 font-mono text-xs">
-                    <button
-                      type="button"
-                      onClick={() => handlePpmStep(-5)}
-                      className="px-2 py-1 bg-ash border border-charcoal hover:border-slate text-silver-mist hover:text-snow rounded-inputs"
-                    >
-                      -5
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handlePpmStep(-1)}
-                      className="px-2 py-1 bg-ash border border-charcoal hover:border-slate text-silver-mist hover:text-snow rounded-inputs"
-                    >
-                      -1
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handlePpmStep(1)}
-                      className="px-2 py-1 bg-ash border border-charcoal hover:border-slate text-silver-mist hover:text-snow rounded-inputs"
-                    >
-                      +1
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handlePpmStep(5)}
-                      className="px-2 py-1 bg-ash border border-charcoal hover:border-slate text-silver-mist hover:text-snow rounded-inputs"
-                    >
-                      +5
-                    </button>
-                  </div>
-                </div>
+                <input
+                  id="ppm-input"
+                  type="range"
+                  min="-100"
+                  max="100"
+                  step="1"
+                  value={dongleConfig.ppm_offset ?? 0}
+                  onChange={(e) =>
+                    setDongleConfig({ ...dongleConfig, ppm_offset: parseInt(e.target.value, 10) })
+                  }
+                  className="w-full accent-phosphor-green cursor-pointer"
+                />
               </div>
 
               {/* RF Gain Mode & Slider */}
@@ -768,8 +740,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
               </div>
 
-              {/* Squelch Buffers */}
-              <div className="grid grid-cols-2 gap-4">
+              {/* Sample Rate & Squelch Buffers */}
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label htmlFor="dongle-sample-rate" className="block text-xs font-medium text-silver-mist mb-1.5">
+                    Sample Rate
+                  </label>
+                  <select
+                    id="dongle-sample-rate"
+                    value={dongleConfig.sample_rate ?? 2048000}
+                    onChange={(e) =>
+                      setDongleConfig({ ...dongleConfig, sample_rate: parseInt(e.target.value, 10) })
+                    }
+                    className="w-full bg-ash border border-slate focus:border-phosphor-green rounded-inputs px-3 py-2 text-xs text-snow outline-none font-mono"
+                  >
+                    <option value={1024000}>1.024 MS/s</option>
+                    <option value={1800000}>1.800 MS/s</option>
+                    <option value={2048000}>2.048 MS/s (Default)</option>
+                    <option value={2400000}>2.400 MS/s</option>
+                    <option value={2800000}>2.800 MS/s</option>
+                  </select>
+                </div>
+
                 <div>
                   <label className="block text-xs font-medium text-silver-mist mb-1.5">
                     Pre-Roll Ring Buffer
@@ -1804,6 +1796,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             </div>
           )}
+          </div>
         </div>
       </div>
     </div>

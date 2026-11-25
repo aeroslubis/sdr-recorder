@@ -13,11 +13,14 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from typing import Any, Dict
+
 import uvicorn
 from fastapi import HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from backend import config as app_config
 from backend.main import create_app
 
 
@@ -59,18 +62,39 @@ def create_app_factory():
     return build_app()
 
 
+def build_uvicorn_kwargs(host: str, port: int, reload: bool) -> Dict[str, Any]:
+    """Build uvicorn.run keyword arguments with env-controlled HTTP access logging."""
+    kwargs: Dict[str, Any] = {
+        "host": host,
+        "port": port,
+        "reload": reload,
+        "log_level": "info",
+        "access_log": app_config.HTTP_ACCESS_LOG,
+    }
+    if reload:
+        kwargs["app"] = "backend.run:create_app_factory"
+        kwargs["factory"] = True
+    return kwargs
+
+
 def main():
     parser = argparse.ArgumentParser(description="SDR-Recorder NVR Server")
     parser.add_argument("--host", default=os.environ.get("SDR_HOST", "0.0.0.0"), help="Host IP to bind (default: 0.0.0.0)")
     parser.add_argument("--port", type=int, default=int(os.environ.get("SDR_PORT", "8000")), help="Port to bind (default: 8000)")
     parser.add_argument("--reload", action="store_true", help="Enable uvicorn auto-reload")
     parser.add_argument("--reset-password", action="store_true", help="Reset admin password to default (12345) and exit")
+    parser.add_argument("--check", action="store_true", help="Run startup requirements check and exit")
     args = parser.parse_args()
+
+    if args.check:
+        from backend.utils.preflight import format_preflight_report, run_preflight_checks
+        report = run_preflight_checks(storage_dir=app_config.STORAGE_DIR)
+        print(format_preflight_report(report))
+        sys.exit(0 if report["ok"] else 1)
 
     if args.reset_password:
         from backend.database import get_connection, init_db
         from backend.models import hash_password
-        import backend.config as app_config
         init_db()
         conn = get_connection()
         cursor = conn.cursor()
@@ -90,23 +114,10 @@ def main():
     print(f"==================================================")
 
     if args.reload:
-        uvicorn.run(
-            "backend.run:create_app_factory",
-            factory=True,
-            host=args.host,
-            port=args.port,
-            reload=True,
-            log_level="info",
-        )
+        uvicorn.run(**build_uvicorn_kwargs(host=args.host, port=args.port, reload=True))
     else:
         app = build_app()
-        uvicorn.run(
-            app,
-            host=args.host,
-            port=args.port,
-            reload=False,
-            log_level="info",
-        )
+        uvicorn.run(app, **build_uvicorn_kwargs(host=args.host, port=args.port, reload=False))
 
 
 if __name__ == "__main__":
