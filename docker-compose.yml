@@ -1,6 +1,6 @@
 services:
   sdr-recorder:
-    image: aeroslubis/sdr-recorder:latest
+    image: ghcr.io/aeroslubis/sdr-recorder:latest
     container_name: sdr-recorder
     restart: unless-stopped
     ports:

@@ -14,7 +14,7 @@ Operational guide for AI agents and developers working in `sdr-recorder` (SDR-Re
 - **System / Media Binaries:** `rtl-sdr` (`rtl_fm`, `rtl_test`), `ffmpeg` (for `.opus` / `.mp3` encoding), `usbutils` (`lsusb`).
 - **Frontend:** TypeScript (`strict: true`), React 18, Vite, Tailwind CSS, Lucide React, Web Audio API (`AudioContext`, `BiquadFilterNode`, `GainNode`, `AnalyserNode`), HTML5 Canvas (24h timeline scrubber & live spectrum visualizer).
 - **Testing:** `pytest` + `pytest-asyncio` (FastAPI `TestClient`, E2E + backend unit tests), Vitest + Testing Library (`jsdom`) for frontend.
-- **Container & CI:** Multi-stage `Dockerfile` (`node:20-slim` -> `python:3.12-slim-bookworm`), `docker-compose.yml`, and `.github/workflows/docker-publish.yml` (builds and pushes to Docker Hub on push to `master`).
+- **Container & CI:** Multi-stage `Dockerfile` (`node:20-slim` -> `python:3.12-slim-bookworm`), `docker-compose.yml`, `.github/workflows/docker-publish.yml` (builds and pushes to GitHub Packages `ghcr.io` on push to `master` / `v*` tags), and `.github/workflows/release.yml` (publishes release archives on `v*` tags).
 
 ---
 
